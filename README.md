@@ -1,5 +1,5 @@
 # picostepseq
 
 
-<img src="./docs/picostepseq_render1.jpg" width=400" />
+<img width=700 src="./docs/picostepseq_render1.jpg"/>
 
