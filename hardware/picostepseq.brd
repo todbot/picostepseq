@@ -189,7 +189,7 @@
 <layer number="255" name="Panel" color="14" fill="1" visible="no" active="yes"/>
 </layers>
 <board>
-<fusionsync huburn="a.cGVyc29uYWw6dWUyOWMzMmM3" projecturn="a.cGVyc29uYWw6dWUyOWMzMmM3IzIwMTgwMjExMTE3NDU0Nzgx" f3durn="urn:adsk.wipprod:dm.lineage:q0faxMznSv-tvb5AxeCuYw" pcbguid="" lastpulledtime="" lastsyncedchangeguid="" latestrevisionid="373cf5b1-f818-493d-a5f2-7b8792cea175" lastsyncedrevisionid="373cf5b1-f818-493d-a5f2-7b8792cea175" lastboardhashguid="04458fd9-93a2-5b55-2fd9-387d269f6656" lastpushedtime="2022-08-06T07:03:54Z" linktopcb3d="true"/>
+<fusionsync huburn="a.cGVyc29uYWw6dWUyOWMzMmM3" projecturn="a.cGVyc29uYWw6dWUyOWMzMmM3IzIwMTgwMjExMTE3NDU0Nzgx" f3durn="urn:adsk.wipprod:dm.lineage:q0faxMznSv-tvb5AxeCuYw" pcbguid="" lastpulledtime="" lastsyncedchangeguid="" latestrevisionid="cd0bd84f-61e0-46ac-8a01-955e9baa8464" lastsyncedrevisionid="cd0bd84f-61e0-46ac-8a01-955e9baa8464" lastboardhashguid="0e842cf4-910d-5aa3-cb1c-00b125aff6fa" lastpushedtime="2022-08-06T16:45:12Z" linktopcb3d="true"/>
 <plain>
 <wire x1="0" y1="52.07" x2="0" y2="2.54" width="0" layer="20"/>
 <wire x1="0" y1="2.54" x2="2.54" y2="0" width="0" layer="20" curve="90"/>
@@ -2228,10 +2228,10 @@ einem neuen Namen ab.</description>
 </signal>
 <signal name="+3V3">
 <polygon width="0.2032" layer="1">
-<vertex x="127.49" y="56.19"/>
-<vertex x="127.49" y="-1.016"/>
-<vertex x="-1.397" y="-1.016"/>
-<vertex x="-1.397" y="56.19"/>
+<vertex x="125.99" y="54.69"/>
+<vertex x="125.99" y="-1.016"/>
+<vertex x="-0.397" y="-1.016"/>
+<vertex x="-0.397" y="54.69"/>
 </polygon>
 <contactref element="U2" pad="8"/>
 <contactref element="R2" pad="2"/>
@@ -2385,11 +2385,11 @@ einem neuen Namen ab.</description>
 <wire x1="66.675" y1="28.067" x2="71.882" y2="22.86" width="0.254" layer="16"/>
 <wire x1="54.68896875" y1="28.067" x2="51.71716875" y2="25.0952" width="0.254" layer="16"/>
 <wire x1="54.68896875" y1="28.067" x2="66.675" y2="28.067" width="0.254" layer="16"/>
-<wire x1="30.726" y1="26.797" x2="28.829" y2="26.797" width="0.254" layer="16"/>
+<wire x1="31.226" y1="26.797" x2="28.829" y2="26.797" width="0.254" layer="16"/>
 <wire x1="28.829" y1="26.797" x2="27.94" y2="27.686" width="0.254" layer="16"/>
 <wire x1="27.94" y1="27.686" x2="27.94" y2="29.21" width="0.254" layer="16"/>
-<wire x1="32.4278" y1="25.0952" x2="30.726" y2="26.797" width="0.254" layer="16"/>
-<wire x1="51.71716875" y1="25.0952" x2="32.4278" y2="25.0952" width="0.254" layer="16"/>
+<wire x1="32.9278" y1="25.0952" x2="31.226" y2="26.797" width="0.254" layer="16"/>
+<wire x1="51.71716875" y1="25.0952" x2="32.9278" y2="25.0952" width="0.254" layer="16"/>
 </signal>
 <signal name="N$10">
 <contactref element="SW6" pad="5"/>

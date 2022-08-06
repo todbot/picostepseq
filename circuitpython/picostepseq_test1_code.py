@@ -1,15 +1,19 @@
+# picosteseq_test1_code.py -- basic proof-of-concept of all IO
+# 5 Aug 2022 - @todbot / Tod Kurt
+# built-in libraries
 import time
 import board
 import digitalio
 import busio
 import keypad
 import rotaryio
-import adafruit_debouncer
 import displayio, terminalio
+# libraries needed to be installed by circup
+import adafruit_debouncer
 import adafruit_displayio_ssd1306
 from adafruit_display_text import bitmap_label as label
 
-# what pins do what
+# all the pin functions
 led_pins = (board.GP0, board.GP2, board.GP4, board.GP6,
             board.GP8, board.GP10, board.GP12, board.GP14)
 
@@ -18,7 +22,10 @@ key_pins = (board.GP1, board.GP3, board.GP5, board.GP7,
 
 encoderA_pin, encoderB_pin, encoderSW_pin = board.GP18, board.GP19, board.GP22
 
-oled_sda, oled_scl = board.GP20, board.GP21
+oled_sda_pin, oled_scl_pin = board.GP20, board.GP21
+
+midi_tx_pin, midi_rx_pin = board.GP16, board.GP17
+
 
 # create the objects handling those pin functions
 def make_led(p): po=digitalio.DigitalInOut(p); po.switch_to_output(); return po
@@ -29,10 +36,15 @@ enctmp = digitalio.DigitalInOut(encoderSW_pin)
 enctmp.pull = digitalio.Pull.UP 
 encoder_sw = adafruit_debouncer.Debouncer( enctmp )
 
+# midi setup
+midi_timeout = 0.01
+uart = busio.UART(tx=midi_tx_pin, rx=midi_rx_pin,
+                  baudrate=31250, timeout=midi_timeout)
+
 # display setup
 displayio.release_displays()
 dw,dh = 128,64
-oled_i2c = busio.I2C( scl=oled_scl, sda=oled_sda )
+oled_i2c = busio.I2C( scl=oled_scl_pin, sda=oled_sda_pin )
 display_bus = displayio.I2CDisplay(oled_i2c, device_address=0x3C)  # or 0x3D depending on display
 display = adafruit_displayio_ssd1306.SSD1306(display_bus, width=dw, height=dh, rotation=0)
 maingroup = displayio.Group()
