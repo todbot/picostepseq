@@ -19,14 +19,13 @@ from adafruit_display_text import bitmap_label as label
 
 # local libraries in CIRCUITPY
 from step_sequencer import StepSequencer, ticks_ms, ticks_diff
-#from adafruit_ticks import ticks_ms, ticks_add, ticks_less
 
-printdebug = True
+printdebug = False
 
-base_note = 48  #  C3
+base_note = 60  #  60 = C4, 48 = C3
 num_steps = 8
-tempo = 10
-gate_default = 0    # ranges 0-15
+tempo = 100
+gate_default = 8    # ranges 0-15
 
 macropad = adafruit_macropad.MacroPad()
 macropad.pixels.brightness = 0.2
@@ -55,17 +54,20 @@ maingroup.append(play_text)
 maingroup.append(transpose_text)
 
 
-play_note_last = 0   #FIXME need gate time
-
-def play_note(step, note, vel, gate, on):  # 
+def play_on_note(step, note, vel, gate, on):  # 
     global play_note_last
-    macropad.pixels.fill(0)
+    #macropad.pixels.fill(0)
     macropad.pixels[step_to_key_pos[step]] = 0xff0000 if on else 0x888888  # FIXME: what to do for step switches?
-    macropad.midi.send( macropad.NoteOff(play_note_last,0), channel=0)
     if on:
-        if printdebug: print("play:%d n:%3d v:%3d %d %d" % (step, note,vel, gate,on), end="\n" )
+        if printdebug: print("on :%d n:%3d v:%3d %d %d" % (step, note,vel, gate,on), end="\n" )
         macropad.midi.send( macropad.NoteOn(note, vel), channel=0)
-        play_note_last = note
+
+def play_off_note(step, note, vel, gate, on):  # 
+    macropad.pixels[step_to_key_pos[step]] = 0 #0xff0000 if on else 0x888888  # FIXME: what to do for step switches?
+    if on:
+        if printdebug: print("off:%d n:%3d v:%3d %d %d" % (step, note,vel, gate,on), end="\n" )
+        macropad.midi.send( macropad.NoteOff(note, vel), channel=0)
+
 
 def update_disp_step(i, n, v=127, gate=8, on=True):
     print("udpate_disp_step:", i,n,v,gate,on )
@@ -91,7 +93,7 @@ def update_display():
         update_disp_step( i, n, v, gate, on)
 
 
-seq = StepSequencer(num_steps, tempo, play_note)
+seq = StepSequencer(num_steps, tempo, play_on_note, play_off_note)
 
 last_debug_millis = 0
 last_encoder_val = macropad.encoder

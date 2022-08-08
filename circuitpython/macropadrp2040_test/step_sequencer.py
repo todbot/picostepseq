@@ -23,17 +23,19 @@ class Step:
     #     self.on = on
 
 class StepSequencer:
-    def __init__(self, step_count, tempo, playfunc):  # also send callbacks?
+    def __init__(self, step_count, tempo, on_func, off_func):
         self.steps_per_beat = 4  # 16th note
         self.step_count = step_count
         #self.last_step = last_step   #  || step_count
         self.i = 0
         self.steps = [ (0,0,8,True) ] * step_count  # step "object" is tuple (note, vel, gate, on)
         #self.steps = [ Step(0) for i in range(step_count) ]
-        self.playfunc = playfunc
+        self.on_func = on_func
+        self.off_func = off_func
         self.set_tempo(tempo)
         self.last_beat_millis = ticks_ms()
         self.next_gate_millis = 0
+        self.prev_note = (0,0)
         self.transpose = 0
         self.playing = True
 
@@ -42,18 +44,21 @@ class StepSequencer:
         print("seq.set_tempo: %6d %d" % (self.beat_millis, tempo) )
         
     def update(self):
-        if not self.playing: return
         now = ticks_ms()
-        if now - self.last_beat_millis > self.beat_millis:
+        if self.playing and now - self.last_beat_millis > self.beat_millis:
             self.last_beat_millis = now
             self.i = (self.i + 1) % self.step_count
             (note,vel,gate,on) = self.steps[self.i]
+            note += self.transpose
             self.next_gate_millis = now + ((self.beat_millis * gate) // 16)  # gate ranges from 1-16
-            self.playfunc(self.i, note, vel, gate, on)
-            
+            self.prev_note = (note,vel, gate, on)
+            self.on_func(self.i, note, vel, gate, on)
+
+        # FIXME: this is broken => stuck notes when params are changed
         if now > self.next_gate_millis and self.next_gate_millis != 0:
             self.next_gate_millis = 0
-            print("----gate off")
+            (note, vel, gate, on) = self.prev_note
+            self.off_func(self.i, note, vel, gate, on)
             
 
     def stop(self):  # FIXME: what about pending note
@@ -62,6 +67,12 @@ class StepSequencer:
         self.i = 0
         self.last_beat_millis = 0
 
+    def pause(self):
+        self.playing = False
+        pass
+    
+    def play(self, play=True):
+        pass
    
     def notenum_to_name(self,notenum):
         octave = notenum // 12 - 1;
