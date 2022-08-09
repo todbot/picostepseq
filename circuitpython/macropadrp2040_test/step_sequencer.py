@@ -78,7 +78,7 @@ class StepSequencer:
         octave = notenum // 12 - 1;
         n = notenum % 12
         note_names = ("C ","C#","D ", "D#", "E ", "F ", "F#", "G ", "G#", "A ", "A#", "B ")
-        return note_names[n] + str(octave)
+        return note_names[n] +"\n"+ str(octave)
 
 
 

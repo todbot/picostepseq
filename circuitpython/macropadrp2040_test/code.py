@@ -27,7 +27,7 @@ from adafruit_display_text import bitmap_label as label
 from step_sequencer import StepSequencer, ticks_ms, ticks_diff
 from step_sequencer_display import StepSequencerDisplay
 
-playdebug = False
+playdebug = True
 uidebug = True
 
 base_note = 60  #  60 = C4, 48 = C3
@@ -38,6 +38,7 @@ gate_default = 8    # ranges 0-15
 macropad = adafruit_macropad.MacroPad()
 macropad.pixels.brightness = 0.2
 macropad.pixels.auto_write = False
+macropad.display.rotation = 90
 
 macropad._encoder_switch.deinit()  # so we can use keypad for debounce, like civilized folk
 encoder_switch = keypad.Keys((board.BUTTON,), value_when_pressed=False, pull=True)
@@ -49,23 +50,32 @@ macropad.display.show(maingroup)
 
 step_to_key_pos = (1, 4, 7, 10, 0, 3, 6, 9)
 
-step_text_pos = ( (0,10), (30,10), (60,10), (90,10),
-                  (0,25), (30,25), (60,25), (90,25) )
+#step_text_pos = ( (0,10), (30,10), (60,10), (90,10),
+#                  (0,25), (30,25), (60,25), (90,25) )
+
+step_text_pos = ( (0,10), (16,10), (32,10), (48,10),
+                  (0,45), (16,45), (32,45), (48,45)  )
+tempo_text_pos = (0, 115)
+trans_text_pos = (0, 95)
+play_text_pos =  (50,115)
+gate_text_offset = (0,-8)
+gate_text_width, gate_text_height = 14, 4
 
 gate_pal = displayio.Palette(1)
 gate_pal[0] = 0xffffff
 stepgroup = displayio.Group()
 gategroup = displayio.Group()
-gatewidth = 16
 maingroup.append(stepgroup)
 maingroup.append(gategroup)
 for (x,y) in step_text_pos:
-    stepgroup.append( label.Label(terminalio.FONT, text="txt ", x=x, y=y))
-    gategroup.append( vectorio.Rectangle(pixel_shader=gate_pal, width=gatewidth, height=4, x=x+1, y=y+6))
-
-tempo_text = label.Label(terminalio.FONT, text="tmpo", x=0, y=57)
-play_text = label.Label(terminalio.FONT, text="play", x=100, y=57)
-transpose_text = label.Label(terminalio.FONT, text="trans", x=50, y=57)
+    stepgroup.append( label.Label(terminalio.FONT, text="txt ", x=x, y=y, line_spacing=0.75))
+    gategroup.append( vectorio.Rectangle(pixel_shader=gate_pal,
+                                         width=gate_text_width, height=gate_text_height,
+                                         x=x+gate_text_offset[0], y=y+gate_text_offset[1]))
+    
+tempo_text = label.Label(terminalio.FONT, text="tmpo", x=tempo_text_pos[0], y=tempo_text_pos[1])
+play_text = label.Label(terminalio.FONT, text="play", x=play_text_pos[0], y=play_text_pos[1])
+transpose_text = label.Label(terminalio.FONT, text="trans", x=trans_text_pos[0], y=trans_text_pos[1])
 maingroup.append(tempo_text)
 maingroup.append(play_text)
 maingroup.append(transpose_text)
@@ -77,7 +87,7 @@ def play_note_on(stepi, note, vel, gate, on):  #
         macropad.midi.send( macropad.NoteOn(note, vel), channel=0)
 
 # callback for sequencer
-def play_note_off(step, note, vel, gate, on):  #
+def play_note_off(stepi, note, vel, gate, on):  #
     if on:
         if playdebug: print("off:%d n:%3d v:%3d %d %d" % (stepi, note,vel, gate,on), end="\n" )
         macropad.midi.send( macropad.NoteOff(note, vel), channel=0)
@@ -85,22 +95,19 @@ def play_note_off(step, note, vel, gate, on):  #
 # 
 def update_ui_step(step, n, v=127, gate=8, on=True):
     if uidebug: print("udpate_disp_step:", step,n,v,gate,on )
-    notestr = seq.notenum_to_name(n) # if on else '---'
-    onstr = " " if on else '*'
-    editstr = "e" if step_push == step else ' '
-    gategroup[step].width = gate * gatewidth // 16
-    #step2_rect.height = gate * 12 // 16
-    #step2_rect.width = gate * 12 // 16
-    stepgroup[step].text = "%3s%1s%1s" % (notestr, onstr, editstr)
+    notestr = seq.notenum_to_name(n)
+    editstr = "." if step_push == step else '*' if not on else ' '
+    stepgroup[step].text = "%3s%1s" % (notestr, editstr)
+    gategroup[step].width = gate * gate_text_width // 16
 
 def update_ui_tempo():
-    tempo_text.text = str(tempo)
+    tempo_text.text = "bpm:%d" % tempo
 
 def update_ui_playing():
-    play_text.text = " > " if seq.playing else "|| "
+    play_text.text = " >" if seq.playing else "||"
 
 def update_ui_transpose():
-    transpose_text.text = "%+2d" % seq.transpose 
+    transpose_text.text = "trs:%+2d" % seq.transpose 
 
 def update_ui_all():
     update_ui_tempo()
@@ -141,7 +148,7 @@ while True:
         macropad.pixels[step_to_key_pos[i]] = c
     macropad.pixels.show()
     
-    #step = seq.update()
+    #step = seq.update() # an idea, update returns ref to current step, for working on
     seq.update()
 
     now = ticks_ms()
@@ -162,6 +169,7 @@ while True:
             seq.steps[ step_push ] = (n,v,gate,on)
             step_edited = True
             update_ui_step( step_push, n, v, gate, on)
+            encoder_delta = 0  # we used up encoder delta
 
         # UI:  encoder turned while step key held == change step's note
         elif step_push > -1:  # step key pressed
@@ -175,19 +183,20 @@ while True:
             seq.steps[ step_push ] = (n,v,gate,on)
             step_edited = True
             update_ui_step( step_push, n, v, gate, on)
+            encoder_delta = 0  # we used up encoder delta
         
         # UI: encoder turned while encoder pushed == change tempo
         elif encoder_push_millis > 0:
             tempo = tempo + encoder_delta
             seq.set_tempo(tempo)
             update_ui_tempo()
+            encoder_delta = 0  # we've used up the encoder delta
         
         # UI: encoder turned without any modifiers == change transpose
         else:
             seq.transpose = min(max(seq.transpose + encoder_delta, -36), 36)
             update_ui_transpose()
-
-        encoder_delta = 0  # say we are done with encoder
+            encoder_delta = 0  # we used up encoder delta
 
     # on encoder push
     encsw = encoder_switch.events.get()
@@ -196,7 +205,7 @@ while True:
             encoder_push_millis = now  # save when we pushed encoder
 
         if encsw.released:
-            if step_push == -1:  # step key is not pressed
+            if step_push == -1 and encoder_delta == 0:  # step key is not pressed and no turn
                 # UI: encoder tap, with no key == play/pause
                 if ticks_diff( ticks_ms(), encoder_push_millis) < 300:
                     seq.playing = not seq.playing
