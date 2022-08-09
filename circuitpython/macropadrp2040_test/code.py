@@ -16,7 +16,7 @@
 # built in libraries
 import random
 import board, keypad
-import displayio, terminalio
+import displayio, terminalio, vectorio
 
 # installed via circup
 import adafruit_midi
@@ -25,9 +25,10 @@ from adafruit_display_text import bitmap_label as label
 
 # local libraries in CIRCUITPY
 from step_sequencer import StepSequencer, ticks_ms, ticks_diff
+from step_sequencer_display import StepSequencerDisplay
 
 playdebug = False
-uidebug = False
+uidebug = True
 
 base_note = 60  #  60 = C4, 48 = C3
 num_steps = 8
@@ -38,23 +39,30 @@ macropad = adafruit_macropad.MacroPad()
 macropad.pixels.brightness = 0.2
 macropad.pixels.auto_write = False
 
-macropad._encoder_switch.deinit()
+macropad._encoder_switch.deinit()  # so we can use keypad for debounce, like civilized folk
 encoder_switch = keypad.Keys((board.BUTTON,), value_when_pressed=False, pull=True)
+
+stepseq_display = StepSequencerDisplay()
 
 maingroup = displayio.Group()
 macropad.display.show(maingroup)
 
 step_to_key_pos = (1, 4, 7, 10, 0, 3, 6, 9)
 
-#step_text_pos = ( (45,10), (45,20), (45,30), (45,40),
-#                  (5,10), (5,20), (5,30), (5,40) )
 step_text_pos = ( (0,10), (30,10), (60,10), (90,10),
                   (0,25), (30,25), (60,25), (90,25) )
-                  
+
+gate_pal = displayio.Palette(1)
+gate_pal[0] = 0xffffff
 stepgroup = displayio.Group()
+gategroup = displayio.Group()
+gatewidth = 16
 maingroup.append(stepgroup)
+maingroup.append(gategroup)
 for (x,y) in step_text_pos:
     stepgroup.append( label.Label(terminalio.FONT, text="txt ", x=x, y=y))
+    gategroup.append( vectorio.Rectangle(pixel_shader=gate_pal, width=gatewidth, height=4, x=x+1, y=y+6))
+
 tempo_text = label.Label(terminalio.FONT, text="tmpo", x=0, y=57)
 play_text = label.Label(terminalio.FONT, text="play", x=100, y=57)
 transpose_text = label.Label(terminalio.FONT, text="trans", x=50, y=57)
@@ -74,13 +82,16 @@ def play_note_off(step, note, vel, gate, on):  #
         if playdebug: print("off:%d n:%3d v:%3d %d %d" % (stepi, note,vel, gate,on), end="\n" )
         macropad.midi.send( macropad.NoteOff(note, vel), channel=0)
 
-
+# 
 def update_ui_step(step, n, v=127, gate=8, on=True):
     if uidebug: print("udpate_disp_step:", step,n,v,gate,on )
     notestr = seq.notenum_to_name(n) # if on else '---'
-    gatestr = " " if on else '*'
+    onstr = " " if on else '*'
     editstr = "e" if step_push == step else ' '
-    stepgroup[step].text = "%1s%3s%1s" % (editstr, notestr, gatestr)
+    gategroup[step].width = gate * gatewidth // 16
+    #step2_rect.height = gate * 12 // 16
+    #step2_rect.width = gate * 12 // 16
+    stepgroup[step].text = "%3s%1s%1s" % (notestr, onstr, editstr)
 
 def update_ui_tempo():
     tempo_text.text = str(tempo)
