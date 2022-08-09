@@ -8,19 +8,18 @@ from adafruit_ticks import ticks_ms, ticks_diff
 #     from time import monotonic_ns as _monotonic_ns  # assume monotonic_ns() exists else we are lame
 #     def ticks_ms(): return _monotonic_ns() // 1_000_000  # stolen from adafruit_ticks
 
-
 ###gate_default = 8  # == 50%  (ranges 0-15)
 
-class Step:
-    note = 0
-    vel = 0
-    gate = 1  # ranges from 1-16
-    on = True
-    # def __init__(self, note,vel=127,on=True):
-    #     self.note = note
-    #     self.vel = vel
-    #     self.gate = 0-1? or 0-15? 
-    #     self.on = on
+# class Step:
+#     note = 0
+#     vel = 0
+#     gate = 1  # ranges from 1-16
+#     on = True
+#     # def __init__(self, note,vel=127,on=True):
+#     #     self.note = note
+#     #     self.vel = vel
+#     #     self.gate = 0-1? or 0-15? 
+#     #     self.on = on
 
 class StepSequencer:
     def __init__(self, step_count, tempo, on_func, off_func):
@@ -29,7 +28,7 @@ class StepSequencer:
         #self.last_step = last_step   #  || step_count
         self.i = 0
         self.steps = [ (0,0,8,True) ] * step_count  # step "object" is tuple (note, vel, gate, on)
-        #self.steps = [ Step(0) for i in range(step_count) ]
+        #self.steps = [ Step() for i in range(step_count) ]
         self.on_func = on_func
         self.off_func = off_func
         self.set_tempo(tempo)
@@ -51,15 +50,16 @@ class StepSequencer:
             (note,vel,gate,on) = self.steps[self.i]
             note += self.transpose
             self.next_gate_millis = now + ((self.beat_millis * gate) // 16)  # gate ranges from 1-16
-            self.prev_note = (note,vel, gate, on)
+            self.prev_note = (note, vel, gate, on)
             self.on_func(self.i, note, vel, gate, on)
 
         # FIXME: this is broken => stuck notes when params are changed
         if now > self.next_gate_millis and self.next_gate_millis != 0:
             self.next_gate_millis = 0
-            (note, vel, gate, on) = self.prev_note
-            self.off_func(self.i, note, vel, gate, on)
-            
+            (onote, ovel, ogate, oon) = self.prev_note
+            (note, vel, gate, on) = self.steps[self.i]  # just for 'on' value
+            self.off_func(self.i, onote, ovel, ogate, on)
+        #return (note, vel, gate, on)
 
     def stop(self):  # FIXME: what about pending note
         print("stop!")

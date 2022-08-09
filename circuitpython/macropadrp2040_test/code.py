@@ -26,7 +26,8 @@ from adafruit_display_text import bitmap_label as label
 # local libraries in CIRCUITPY
 from step_sequencer import StepSequencer, ticks_ms, ticks_diff
 
-printdebug = False
+playdebug = False
+uidebug = False
 
 base_note = 60  #  60 = C4, 48 = C3
 num_steps = 8
@@ -62,26 +63,23 @@ maingroup.append(play_text)
 maingroup.append(transpose_text)
 
 # callback for sequencer
-def play_note_on(step, note, vel, gate, on):  #
-    macropad.pixels[step_to_key_pos[step]] = 0xff0000 # if on else 0xff0000
+def play_note_on(stepi, note, vel, gate, on):  #
     if on:
-        if printdebug: print("on :%d n:%3d v:%3d %d %d" % (step, note,vel, gate,on), end="\n" )
+        if playdebug: print("on :%d n:%3d v:%3d %d %d" % (stepi, note,vel, gate,on), end="\n" )
         macropad.midi.send( macropad.NoteOn(note, vel), channel=0)
 
 # callback for sequencer
 def play_note_off(step, note, vel, gate, on):  #
-    macropad.pixels[step_to_key_pos[step]] = 0x330000 # if on else 0x000000
     if on:
-        if printdebug: print("off:%d n:%3d v:%3d %d %d" % (step, note,vel, gate,on), end="\n" )
+        if playdebug: print("off:%d n:%3d v:%3d %d %d" % (stepi, note,vel, gate,on), end="\n" )
         macropad.midi.send( macropad.NoteOff(note, vel), channel=0)
 
 
 def update_ui_step(step, n, v=127, gate=8, on=True):
-    print("udpate_disp_step:", step,n,v,gate,on )
+    if uidebug: print("udpate_disp_step:", step,n,v,gate,on )
     notestr = seq.notenum_to_name(n) # if on else '---'
     gatestr = " " if on else '*'
     editstr = "e" if step_push == step else ' '
-    macropad.pixels[step_to_key_pos[step]] = 0x330000 if on else 0x000000
     stepgroup[step].text = "%1s%3s%1s" % (editstr, notestr, gatestr)
 
 def update_ui_tempo():
@@ -107,10 +105,10 @@ seq = StepSequencer(num_steps, tempo, play_note_on, play_note_off)
 # various state for UI hanlding
 last_debug_millis = 0
 last_encoder_val = macropad.encoder  # needed to calculate encoder_delta
-encoder_push_millis = 0  # when was encoder pushed
-encoder_delta = 0 # how much encoder was turned
-step_push = -1  # which step button is being pushed
-step_push_millis = 0   # when was a step button pushed
+encoder_push_millis = 0  # when was encoder pushed, 0 == no push
+encoder_delta = 0 # how much encoder was turned, 0 == no turn
+step_push = -1  # which step button is being pushed, -1 == no push
+step_push_millis = 0  # when was a step button pushed (extra? maybe 
 step_edited = False
 
 # init sequencer with saved / default
@@ -123,21 +121,27 @@ for i in range(num_steps):
 update_ui_all()
 
 while True:
+    # update step LEDs
+    for i in range(num_steps):
+        (n,v,gate,on) = seq.steps[ i ]
+        c = 0x000000 # turn LED off
+        if i == seq.i:  c = 0xff0000  # UI: bright red = indicate sequence position
+        elif on:        c = 0x110000  # UI: dim red = indicate mute/unmute state
+        macropad.pixels[step_to_key_pos[i]] = c
     macropad.pixels.show()
     
+    #step = seq.update()
     seq.update()
 
-    #if ticks_diff(ticks_ms(), last_debug_millis) > 5000:
-    #    last_debug_millis = ticks_ms()
-    #    print(last_debug_millis, "----------- hi")
-
+    now = ticks_ms()
+    
     # update encoder turning
     encoder_val = macropad.encoder
     if encoder_val != last_encoder_val:
         encoder_delta = (encoder_val - last_encoder_val)
         last_encoder_val = encoder_val
-        
-    # if encoder turned
+
+    # on encoder turn
     if encoder_delta:
 
         # UI: encoder turned and pushed while step key held == change step's gate
@@ -172,27 +176,30 @@ while True:
             seq.transpose = min(max(seq.transpose + encoder_delta, -36), 36)
             update_ui_transpose()
 
-        encoder_delta = 0  # we used up the encoder
+        encoder_delta = 0  # say we are done with encoder
 
-    # encoder push
+    # on encoder push
     encsw = encoder_switch.events.get()
     if encsw:
         if encsw.pressed:
-            encoder_push_millis = ticks_ms()  # save when we pushed encoder
+            encoder_push_millis = now  # save when we pushed encoder
 
         if encsw.released:
-            # UI: encoder tap, with no key == play/pause
-            if ticks_diff( ticks_ms(), encoder_push_millis) < 300 and step_push == -1:
-                seq.playing = not seq.playing
-                update_ui_playing()
-            # # encoder hold with no key == STOP and reset playhead to 0
-            # FIXME: broken. doesn't re-start at 0 properly
-            # elif ticks_diff( ticks_ms(), encoder_push_millis) > 1000 and step_push == -1:
-            #     seq.stop()
-            #     update_display()
+            if step_push == -1:  # step key is not pressed
+                # UI: encoder tap, with no key == play/pause
+                if ticks_diff( ticks_ms(), encoder_push_millis) < 300:
+                    seq.playing = not seq.playing
+                    update_ui_playing()
+                # UI encoder hold with no key == STOP and reset playhead to 0
+                # FIXME: broken. doesn't re-start at 0 properly
+                elif ticks_diff( ticks_ms(), encoder_push_millis) > 1000:
+                    seq.stop()
+                    update_ui_all()
+            else:  # step key is pressed
+                pass
             encoder_push_millis = 0  # say we are done with encoder
 
-    # step key push
+    # on step key push
     key = macropad.keys.events.get()
     if key:
         try:
@@ -211,7 +218,7 @@ while True:
                     play_note_on( step_push, n, v, gate, True )
 
             elif key.released:
-                print("- release", key.key_number, step_push, "edited:",step_edited)
+                print("- release", key.key_number, step_push)
                 if seq.playing:
                     if not step_edited:
                         # UI: if playing, step keys == toggles enable
@@ -229,3 +236,6 @@ while True:
         except ValueError:  # undefined macropad key was pressed, ignore
             pass
             
+    #
+    #emillis = ticks_ms() - now
+    #print("emillis:",emillis)
