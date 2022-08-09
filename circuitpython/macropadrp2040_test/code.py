@@ -2,16 +2,18 @@
 # 6 Aug 2022 - @todbot / Tod Kurt
 #
 # User interface:
+# "Encocder-first" actions:
 # - Tap encoder to toggle play / pause
 # - Turn encoder to change tranpose
 # - Push + turn encoder to change transpose
+# "Step key-first" actions:
 # - Tap step button to enable/disable from sequence
 # - Hold step button + turn encoder to change note
 # - Hold step button + push encoder + turn encoder to change gate length
 #
 
 
-# built in modules
+# built in libraries
 import random
 import board, keypad
 import displayio, terminalio
@@ -28,11 +30,13 @@ printdebug = False
 
 base_note = 60  #  60 = C4, 48 = C3
 num_steps = 8
-tempo = 100
+tempo = 80
 gate_default = 8    # ranges 0-15
 
 macropad = adafruit_macropad.MacroPad()
 macropad.pixels.brightness = 0.2
+macropad.pixels.auto_write = False
+
 macropad._encoder_switch.deinit()
 encoder_switch = keypad.Keys((board.BUTTON,), value_when_pressed=False, pull=True)
 
@@ -59,16 +63,14 @@ maingroup.append(transpose_text)
 
 # callback for sequencer
 def play_note_on(step, note, vel, gate, on):  #
-    global play_note_last
-    #macropad.pixels.fill(0)
-    macropad.pixels[step_to_key_pos[step]] = 0xff0000 if on else 0xff0000
+    macropad.pixels[step_to_key_pos[step]] = 0xff0000 # if on else 0xff0000
     if on:
         if printdebug: print("on :%d n:%3d v:%3d %d %d" % (step, note,vel, gate,on), end="\n" )
         macropad.midi.send( macropad.NoteOn(note, vel), channel=0)
 
 # callback for sequencer
 def play_note_off(step, note, vel, gate, on):  #
-    macropad.pixels[step_to_key_pos[step]] = 0x330000 if on else 0x000000
+    macropad.pixels[step_to_key_pos[step]] = 0x330000 # if on else 0x000000
     if on:
         if printdebug: print("off:%d n:%3d v:%3d %d %d" % (step, note,vel, gate,on), end="\n" )
         macropad.midi.send( macropad.NoteOff(note, vel), channel=0)
@@ -76,11 +78,11 @@ def play_note_off(step, note, vel, gate, on):  #
 
 def update_ui_step(step, n, v=127, gate=8, on=True):
     print("udpate_disp_step:", step,n,v,gate,on )
-    nstr = seq.notenum_to_name(n) # if on else '---'
-    gstr = " " if on else '*'
-    estr = "e" if step_push == step else ' '
-    stepgroup[step].text = "%1s%3s%1s" % (" ", nstr, gstr)
+    notestr = seq.notenum_to_name(n) # if on else '---'
+    gatestr = " " if on else '*'
+    editstr = "e" if step_push == step else ' '
     macropad.pixels[step_to_key_pos[step]] = 0x330000 if on else 0x000000
+    stepgroup[step].text = "%1s%3s%1s" % (editstr, notestr, gatestr)
 
 def update_ui_tempo():
     tempo_text.text = str(tempo)
@@ -121,6 +123,7 @@ for i in range(num_steps):
 update_ui_all()
 
 while True:
+    macropad.pixels.show()
     
     seq.update()
 
@@ -200,27 +203,28 @@ while True:
             (n,v,gate,on) = seq.steps[step_push]
 
             if key.pressed:
-                print("press",key.key_number)
+                print("+ press",key.key_number, step_push)
+                update_ui_step( step_push, n, v, gate, on)
                 
                 # UI: if not playing, step keys == play their pitches
                 if not seq.playing: 
                     play_note_on( step_push, n, v, gate, True )
-                
-            if key.released:
-                print("release", key.key_number)
+
+            elif key.released:
+                print("- release", key.key_number, step_push, "edited:",step_edited)
                 if seq.playing:
                     if not step_edited:
                         # UI: if playing, step keys == toggles enable
                         on = not on
                         seq.steps[step_push] = (n,v,gate, on)
-                        update_ui_step( step_push, n, v, gate, on)
                 else:
                     # UI: if not playing, step key == play their pitches
                     (n,v,gate,on) = seq.steps[step_push]
                     play_note_off( step_push, n, v, gate, True )
-
+                sp_tmp = step_push
                 step_push = -1  # say we are done with key
-                step_edited = False
+                step_edited = False  # done editing
+                update_ui_step( sp_tmp, n, v, gate, on)
 
         except ValueError:  # undefined macropad key was pressed, ignore
             pass
