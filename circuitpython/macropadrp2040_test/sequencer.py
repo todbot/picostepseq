@@ -1,3 +1,6 @@
+# sequencer_display.py -- picostepseq displayio object for MacroPad RP2040
+# 6 Aug 2022 - @todbot / Tod Kurt
+# Part of picostepseq : https://github.com/todbot/picostepseq/
 
 from adafruit_ticks import ticks_ms, ticks_diff
 
@@ -18,7 +21,7 @@ from adafruit_ticks import ticks_ms, ticks_diff
 #     # def __init__(self, note,vel=127,on=True):
 #     #     self.note = note
 #     #     self.vel = vel
-#     #     self.gate = 0-1? or 0-15? 
+#     #     self.gate = 0-1? or 0-15?
 #     #     self.on = on
 
 class StepSequencer:
@@ -28,7 +31,6 @@ class StepSequencer:
         #self.last_step = last_step   #  || step_count
         self.i = 0
         self.steps = [ (0,0,8,True) ] * step_count  # step "object" is tuple (note, vel, gate, on)
-        #self.steps = [ Step() for i in range(step_count) ]
         self.on_func = on_func
         self.off_func = off_func
         self.set_tempo(tempo)
@@ -39,9 +41,10 @@ class StepSequencer:
         self.playing = True
 
     def set_tempo(self,tempo):
+        self.tempo = tempo
         self.beat_millis = 60_000 // self.steps_per_beat // tempo
         print("seq.set_tempo: %6d %d" % (self.beat_millis, tempo) )
-        
+
     def update(self):
         now = ticks_ms()
         if self.playing and now - self.last_beat_millis > self.beat_millis:
@@ -70,10 +73,10 @@ class StepSequencer:
     def pause(self):
         self.playing = False
         pass
-    
+
     def play(self, play=True):
         pass
-   
+
     def notenum_to_name(self,notenum):
         octave = notenum // 12 - 1;
         n = notenum % 12
@@ -84,18 +87,18 @@ class StepSequencer:
 
 # if __name__ == "__main__":
 #     import time, random
-    
+
 #     print("hello there")
 
 #     def play_note(step, note, vel):
 #         print("play: s:%d n:%3d v:%3d" % (step, note,vel) )
-        
+
 #     seq = StepSequencer(8, 120, play_note)
 
 #     last_time = time.monotonic()
 #     while True:
 #         seq.update()
-        
+
 #         if time.monotonic() - last_time > 5:
 #             last_time = time.monotonic()
 #             print("hi")
@@ -103,5 +106,3 @@ class StepSequencer:
 #             rn = random.randint(30,50)
 #             rv = random.randint(30,120)
 #             seq[ri] = (rn, rv)
-            
-        

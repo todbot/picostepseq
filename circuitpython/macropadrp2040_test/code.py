@@ -1,5 +1,6 @@
-# macropadrp2040_step_sequencer_test.py -- 
+# macropadrp2040_step_sequencer_test.py --
 # 6 Aug 2022 - @todbot / Tod Kurt
+# Part of picostepseq: https://github.com/todbot/picostepseq/
 #
 # User interface:
 # "Encocder-first" actions:
@@ -16,19 +17,16 @@
 # built in libraries
 import random
 import board, keypad
-import displayio, terminalio, vectorio
 
 # installed via circup
 import adafruit_midi
 import adafruit_macropad
-from adafruit_display_text import bitmap_label as label
 
 # local libraries in CIRCUITPY
-from step_sequencer import StepSequencer, ticks_ms, ticks_diff
-from step_sequencer_display import StepSequencerDisplay
+from sequencer import StepSequencer, ticks_ms, ticks_diff
+from sequencer_display_macropad import StepSequencerDisplay
 
-playdebug = True
-uidebug = True
+playdebug = False
 
 base_note = 60  #  60 = C4, 48 = C3
 num_steps = 8
@@ -43,42 +41,8 @@ macropad.display.rotation = 90
 macropad._encoder_switch.deinit()  # so we can use keypad for debounce, like civilized folk
 encoder_switch = keypad.Keys((board.BUTTON,), value_when_pressed=False, pull=True)
 
-stepseq_display = StepSequencerDisplay()
-
-maingroup = displayio.Group()
-macropad.display.show(maingroup)
-
+# map step position to macropad key number
 step_to_key_pos = (1, 4, 7, 10, 0, 3, 6, 9)
-
-#step_text_pos = ( (0,10), (30,10), (60,10), (90,10),
-#                  (0,25), (30,25), (60,25), (90,25) )
-
-step_text_pos = ( (0,10), (16,10), (32,10), (48,10),
-                  (0,45), (16,45), (32,45), (48,45)  )
-tempo_text_pos = (0, 115)
-trans_text_pos = (0, 95)
-play_text_pos =  (50,115)
-gate_text_offset = (0,-8)
-gate_text_width, gate_text_height = 14, 4
-
-gate_pal = displayio.Palette(1)
-gate_pal[0] = 0xffffff
-stepgroup = displayio.Group()
-gategroup = displayio.Group()
-maingroup.append(stepgroup)
-maingroup.append(gategroup)
-for (x,y) in step_text_pos:
-    stepgroup.append( label.Label(terminalio.FONT, text="txt ", x=x, y=y, line_spacing=0.75))
-    gategroup.append( vectorio.Rectangle(pixel_shader=gate_pal,
-                                         width=gate_text_width, height=gate_text_height,
-                                         x=x+gate_text_offset[0], y=y+gate_text_offset[1]))
-    
-tempo_text = label.Label(terminalio.FONT, text="tmpo", x=tempo_text_pos[0], y=tempo_text_pos[1])
-play_text = label.Label(terminalio.FONT, text="play", x=play_text_pos[0], y=play_text_pos[1])
-transpose_text = label.Label(terminalio.FONT, text="trans", x=trans_text_pos[0], y=trans_text_pos[1])
-maingroup.append(tempo_text)
-maingroup.append(play_text)
-maingroup.append(transpose_text)
 
 # callback for sequencer
 def play_note_on(stepi, note, vel, gate, on):  #
@@ -88,37 +52,24 @@ def play_note_on(stepi, note, vel, gate, on):  #
 
 # callback for sequencer
 def play_note_off(stepi, note, vel, gate, on):  #
-    if on:
-        if playdebug: print("off:%d n:%3d v:%3d %d %d" % (stepi, note,vel, gate,on), end="\n" )
-        macropad.midi.send( macropad.NoteOff(note, vel), channel=0)
-
-# 
-def update_ui_step(step, n, v=127, gate=8, on=True):
-    if uidebug: print("udpate_disp_step:", step,n,v,gate,on )
-    notestr = seq.notenum_to_name(n)
-    editstr = "." if step_push == step else '*' if not on else ' '
-    stepgroup[step].text = "%3s%1s" % (notestr, editstr)
-    gategroup[step].width = gate * gate_text_width // 16
-
-def update_ui_tempo():
-    tempo_text.text = "bpm:%d" % tempo
-
-def update_ui_playing():
-    play_text.text = " >" if seq.playing else "||"
-
-def update_ui_transpose():
-    transpose_text.text = "trs:%+2d" % seq.transpose 
-
-def update_ui_all():
-    update_ui_tempo()
-    update_ui_playing()
-    update_ui_transpose()
-    for i in range(num_steps):
-        (n,v,gate,on) = seq.steps[i]
-        update_ui_step( i, n, v, gate, on)
-
+    #if on:
+    # FIXME: always do note off to since race condition of note muted right after playing
+    if playdebug: print("off:%d n:%3d v:%3d %d %d" % (stepi, note,vel, gate,on), end="\n" )
+    macropad.midi.send( macropad.NoteOff(note, vel), channel=0)
 
 seq = StepSequencer(num_steps, tempo, play_note_on, play_note_off)
+
+seq_display = StepSequencerDisplay(seq)
+macropad.display.show( seq_display )
+
+# init sequencer with saved / default
+for i in range(num_steps):
+    (n,v,gate,on) = (base_note, 127, gate_default, True)
+    seq.steps[ i ] = (n,v,gate,on)
+    seq_display.update_ui_step(i, n, v, gate, on, False)
+
+# init display UI
+seq_display.update_ui_all()
 
 # various state for UI hanlding
 last_debug_millis = 0
@@ -126,17 +77,8 @@ last_encoder_val = macropad.encoder  # needed to calculate encoder_delta
 encoder_push_millis = 0  # when was encoder pushed, 0 == no push
 encoder_delta = 0 # how much encoder was turned, 0 == no turn
 step_push = -1  # which step button is being pushed, -1 == no push
-step_push_millis = 0  # when was a step button pushed (extra? maybe 
+step_push_millis = 0  # when was a step button pushed (extra? maybe
 step_edited = False
-
-# init sequencer with saved / default
-for i in range(num_steps):
-    (n,v,gate,on) = (base_note, 127, gate_default, True)
-    seq.steps[ i ] = (n,v,gate,on)
-    update_ui_step(i, n, v, gate, on)
-
-# init display UI
-update_ui_all()
 
 while True:
     # update step LEDs
@@ -147,12 +89,12 @@ while True:
         elif on:        c = 0x110000  # UI: dim red = indicate mute/unmute state
         macropad.pixels[step_to_key_pos[i]] = c
     macropad.pixels.show()
-    
+
     #step = seq.update() # an idea, update returns ref to current step, for working on
     seq.update()
 
     now = ticks_ms()
-    
+
     # update encoder turning
     encoder_val = macropad.encoder
     if encoder_val != last_encoder_val:
@@ -168,7 +110,7 @@ while True:
             gate = min(max(gate + encoder_delta, 1), 15)
             seq.steps[ step_push ] = (n,v,gate,on)
             step_edited = True
-            update_ui_step( step_push, n, v, gate, on)
+            seq_display.update_ui_step( step_push, n, v, gate, on)
             encoder_delta = 0  # we used up encoder delta
 
         # UI:  encoder turned while step key held == change step's note
@@ -179,23 +121,23 @@ while True:
             n = min(max(n + encoder_delta, 1), 127)
             if not seq.playing:
                 play_note_on( step_push, n, v, gate, True )
-            
+
             seq.steps[ step_push ] = (n,v,gate,on)
             step_edited = True
-            update_ui_step( step_push, n, v, gate, on)
+            seq_display.update_ui_step( step_push, n, v, gate, on)
             encoder_delta = 0  # we used up encoder delta
-        
+
         # UI: encoder turned while encoder pushed == change tempo
         elif encoder_push_millis > 0:
             tempo = tempo + encoder_delta
             seq.set_tempo(tempo)
-            update_ui_tempo()
+            seq_display.update_ui_tempo()
             encoder_delta = 0  # we've used up the encoder delta
-        
+
         # UI: encoder turned without any modifiers == change transpose
         else:
             seq.transpose = min(max(seq.transpose + encoder_delta, -36), 36)
-            update_ui_transpose()
+            seq_display.update_ui_transpose()
             encoder_delta = 0  # we used up encoder delta
 
     # on encoder push
@@ -209,12 +151,12 @@ while True:
                 # UI: encoder tap, with no key == play/pause
                 if ticks_diff( ticks_ms(), encoder_push_millis) < 300:
                     seq.playing = not seq.playing
-                    update_ui_playing()
+                    seq_display.update_ui_playing()
                 # UI encoder hold with no key == STOP and reset playhead to 0
                 # FIXME: broken. doesn't re-start at 0 properly
                 elif ticks_diff( ticks_ms(), encoder_push_millis) > 1000:
                     seq.stop()
-                    update_ui_all()
+                    seq_display.update_ui_all()
             else:  # step key is pressed
                 pass
             encoder_push_millis = 0  # say we are done with encoder
@@ -231,10 +173,10 @@ while True:
 
             if key.pressed:
                 print("+ press",key.key_number, step_push)
-                update_ui_step( step_push, n, v, gate, on)
-                
+                seq_display.update_ui_step( step_push, n, v, gate, on, True)
+
                 # UI: if not playing, step keys == play their pitches
-                if not seq.playing: 
+                if not seq.playing:
                     play_note_on( step_push, n, v, gate, True )
 
             elif key.released:
@@ -251,11 +193,11 @@ while True:
                 sp_tmp = step_push
                 step_push = -1  # say we are done with key
                 step_edited = False  # done editing
-                update_ui_step( sp_tmp, n, v, gate, on)
+                seq_display.update_ui_step( sp_tmp, n, v, gate, on)
 
         except ValueError:  # undefined macropad key was pressed, ignore
             pass
-            
+
     #
     #emillis = ticks_ms() - now
     #print("emillis:",emillis)
