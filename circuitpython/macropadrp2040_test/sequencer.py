@@ -2,14 +2,14 @@
 # 6 Aug 2022 - @todbot / Tod Kurt
 # Part of picostepseq : https://github.com/todbot/picostepseq/
 
-from adafruit_ticks import ticks_ms, ticks_diff
-
 # let's get a millis function
-# try:
-#     from supervisor import ticks_ms  # thank you dhalbert
-# except (ImportError,NameError,NotImplementedError):
-#     from time import monotonic_ns as _monotonic_ns  # assume monotonic_ns() exists else we are lame
-#     def ticks_ms(): return _monotonic_ns() // 1_000_000  # stolen from adafruit_ticks
+try:
+     from supervisor import ticks_ms  # thank you dhalbert
+except (ImportError,NameError,NotImplementedError):
+     from time import monotonic_ns as _monotonic_ns  # assume monotonic_ns() exists else we are lame
+     def ticks_ms(): return _monotonic_ns() // 1_000_000  # stolen from adafruit_ticks
+
+def ticks_diff(t1,t2): return t1-t2
 
 ###gate_default = 8  # == 50%  (ranges 0-15)
 
@@ -43,26 +43,27 @@ class StepSequencer:
     def set_tempo(self,tempo):
         self.tempo = tempo
         self.beat_millis = 60_000 // self.steps_per_beat // tempo
-        print("seq.set_tempo: %6d %d" % (self.beat_millis, tempo) )
+        print("seq.set_tempo: %6.2f %d" % (self.beat_millis, tempo) )
 
     def update(self):
         now = ticks_ms()
-        if self.playing and now - self.last_beat_millis > self.beat_millis:
-            self.last_beat_millis = now
+        delta_t = now - self.last_beat_millis
+        if self.playing and delta_t > self.beat_millis:
             self.i = (self.i + 1) % self.step_count
             (note,vel,gate,on) = self.steps[self.i]
             note += self.transpose
             self.next_gate_millis = now + ((self.beat_millis * gate) // 16)  # gate ranges from 1-16
-            self.prev_note = (note, vel, gate, on)
-            self.on_func(self.i, note, vel, gate, on)
+            self.prev_note = (note,vel,gate,on) # save for note off
+            self.on_func(note, vel, gate, on)
+            err_t = delta_t - self.beat_millis  # how much we are over
+            self.last_beat_millis = now - err_t  # adjust for our overage
 
         # FIXME: this is broken => stuck notes when params are changed
         if now > self.next_gate_millis and self.next_gate_millis != 0:
             self.next_gate_millis = 0
             (onote, ovel, ogate, oon) = self.prev_note
             (note, vel, gate, on) = self.steps[self.i]  # just for 'on' value
-            self.off_func(self.i, onote, ovel, ogate, on)
-        #return (note, vel, gate, on)
+            self.off_func(onote, ovel, ogate, on)
 
     def stop(self):  # FIXME: what about pending note
         print("stop!")
