@@ -8,7 +8,7 @@
 </settings>
 <grid distance="0.5" unitdist="mm" unit="mm" style="lines" multiple="1" display="no" altdistance="1" altunitdist="mm" altunit="mm"/>
 <layers>
-<layer number="1" name="Top" color="4" fill="1" visible="no" active="yes"/>
+<layer number="1" name="Top" color="4" fill="1" visible="yes" active="yes"/>
 <layer number="2" name="Route2" color="16" fill="1" visible="no" active="no"/>
 <layer number="3" name="Route3" color="17" fill="1" visible="no" active="no"/>
 <layer number="4" name="Route4" color="18" fill="1" visible="no" active="no"/>
@@ -28,11 +28,11 @@
 <layer number="18" name="Vias" color="2" fill="1" visible="yes" active="yes"/>
 <layer number="19" name="Unrouted" color="6" fill="1" visible="yes" active="yes"/>
 <layer number="20" name="Dimension" color="15" fill="1" visible="yes" active="yes"/>
-<layer number="21" name="tPlace" color="7" fill="1" visible="no" active="yes"/>
+<layer number="21" name="tPlace" color="7" fill="1" visible="yes" active="yes"/>
 <layer number="22" name="bPlace" color="7" fill="1" visible="yes" active="yes"/>
-<layer number="23" name="tOrigins" color="15" fill="1" visible="no" active="yes"/>
+<layer number="23" name="tOrigins" color="15" fill="1" visible="yes" active="yes"/>
 <layer number="24" name="bOrigins" color="15" fill="1" visible="yes" active="yes"/>
-<layer number="25" name="tNames" color="7" fill="1" visible="no" active="yes"/>
+<layer number="25" name="tNames" color="7" fill="1" visible="yes" active="yes"/>
 <layer number="26" name="bNames" color="7" fill="1" visible="yes" active="yes"/>
 <layer number="27" name="tValues" color="7" fill="1" visible="no" active="yes"/>
 <layer number="28" name="bValues" color="7" fill="1" visible="no" active="yes"/>
@@ -46,9 +46,9 @@
 <layer number="36" name="bGlue" color="7" fill="5" visible="no" active="yes"/>
 <layer number="37" name="tTest" color="7" fill="1" visible="no" active="yes"/>
 <layer number="38" name="bTest" color="7" fill="1" visible="no" active="yes"/>
-<layer number="39" name="tKeepout" color="4" fill="11" visible="no" active="yes"/>
+<layer number="39" name="tKeepout" color="4" fill="11" visible="yes" active="yes"/>
 <layer number="40" name="bKeepout" color="1" fill="11" visible="yes" active="yes"/>
-<layer number="41" name="tRestrict" color="4" fill="10" visible="no" active="yes"/>
+<layer number="41" name="tRestrict" color="4" fill="10" visible="yes" active="yes"/>
 <layer number="42" name="bRestrict" color="1" fill="10" visible="yes" active="yes"/>
 <layer number="43" name="vRestrict" color="2" fill="10" visible="no" active="yes"/>
 <layer number="44" name="Drills" color="7" fill="1" visible="no" active="yes"/>
@@ -58,7 +58,7 @@
 <layer number="48" name="Document" color="7" fill="1" visible="no" active="yes"/>
 <layer number="49" name="Reference" color="7" fill="1" visible="no" active="yes"/>
 <layer number="50" name="dxf" color="7" fill="1" visible="no" active="no"/>
-<layer number="51" name="tDocu" color="7" fill="1" visible="no" active="yes"/>
+<layer number="51" name="tDocu" color="7" fill="1" visible="yes" active="yes"/>
 <layer number="52" name="bDocu" color="7" fill="1" visible="yes" active="yes"/>
 <layer number="53" name="tGND_GNDA" color="7" fill="9" visible="no" active="no"/>
 <layer number="54" name="bGND_GNDA" color="1" fill="9" visible="no" active="no"/>
@@ -199,13 +199,13 @@
 <wire x1="125.73" y1="52.07" x2="123.19" y2="54.61" width="0" layer="20" curve="90"/>
 <wire x1="123.19" y1="54.61" x2="2.54" y2="54.61" width="0" layer="20"/>
 <wire x1="2.54" y1="54.61" x2="0" y2="52.07" width="0" layer="20" curve="90"/>
-<text x="38.7835" y="42.1695" size="0.9" layer="22" font="vector" ratio="10" rot="MR0">picostepseq_4Aug2022</text>
-<text x="111.4915" y="28.5895" size="1.27" layer="21" font="vector" ratio="14">MIDI OUT</text>
-<text x="111.5645" y="39.7415" size="1.27" layer="21" font="vector" ratio="14">MIDI IN</text>
+<text x="38.7835" y="42.1695" size="0.9" layer="22" font="vector" ratio="10" rot="MR0">picostepseq_7Aug2022</text>
+<text x="111.4915" y="39.5895" size="1.27" layer="21" font="vector" ratio="14">MIDI OUT</text>
+<text x="111.5645" y="28.7415" size="1.27" layer="21" font="vector" ratio="14">MIDI IN</text>
 <text x="120.5" y="39" size="1.778" layer="22" rot="SMR270" align="bottom-center">MIDI
 TRS-A</text>
-<text x="120" y="47.5" size="1.778" layer="22" rot="SMR270" align="bottom-center">IN</text>
-<text x="120.38" y="30.25" size="1.778" layer="22" rot="SMR270" align="bottom-center">OUT</text>
+<text x="120" y="30" size="1.778" layer="22" rot="SMR270" align="bottom-center">IN</text>
+<text x="120.38" y="47.25" size="1.778" layer="22" rot="SMR270" align="bottom-center">OUT</text>
 <text x="77.47" y="40.64" size="1.778" layer="22" rot="SMR0">Pico Step Seq</text>
 <text x="38.7675" y="44.3865" size="0.9" layer="22" font="vector" ratio="10" rot="MR0">github.com/todbot/picostepseq</text>
 <wire x1="-2.111" y1="-2.589" x2="57.651" y2="-2.589" width="0.1016" layer="48"/>
