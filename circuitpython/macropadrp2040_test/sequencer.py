@@ -65,6 +65,12 @@ class StepSequencer:
             (note, vel, gate, on) = self.steps[self.i]  # just for 'on' value
             self.off_func(onote, ovel, ogate, on)
 
+    def toggle_play_pause(self):
+        if self.playing:
+            self.pause()
+        else:
+            self.play()
+
     def stop(self):  # FIXME: what about pending note
         print("stop!")
         self.playing = False
@@ -73,10 +79,10 @@ class StepSequencer:
 
     def pause(self):
         self.playing = False
-        pass
 
     def play(self, play=True):
-        pass
+        self.last_beat_millis = ticks_ms() - self.beat_millis
+        self.playing = True
 
     def notenum_to_name(self,notenum):
         octave = notenum // 12 - 1;

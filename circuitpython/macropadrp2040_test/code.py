@@ -131,12 +131,12 @@ while True:
         elif step_push > -1:  # step key pressed
             (n,v,gate,on) = seq.steps[ step_push ]
             if not seq.playing:
-                play_note_off( step_push, n, v, gate, True)
+                play_note_off( n, v, gate, True)
 
             n = min(max(n + encoder_delta, 1), 127)
 
             if not seq.playing:
-                play_note_on( step_push, n, v, gate, True )
+                play_note_on( n, v, gate, True )
 
             seq.steps[ step_push ] = (n,v,gate,on)
             step_edited = True
@@ -166,7 +166,7 @@ while True:
             if step_push == -1 and encoder_delta == 0:  # step key is not pressed and no turn
                 # UI: encoder tap, with no key == play/pause
                 if ticks_diff( ticks_ms(), encoder_push_millis) < 300:
-                    seq.playing = not seq.playing
+                    seq.toggle_play_pause()
                     seq_display.update_ui_playing()
                 # UI encoder hold with no key == STOP and reset playhead to 0
                 # FIXME: broken. doesn't re-start at 0 properly
@@ -200,26 +200,23 @@ while True:
                 else:
                     seq_display.update_ui_step( step_push, n, v, gate, on, True)
                     if seq.playing:
-                        if not step_edited:
-                            # UI: if playing, step keys == toggles enable
-                            on = not on
-                            seq.steps[step_push] = (n,v,gate, on)
+                        pass
                     # UI: if not playing, step keys == play their pitches
                     else:
-                        play_note_on( step_push, n, v, gate, True )
+                        play_note_on( n, v, gate, True )
 
             elif key.released:
                 print("- release", key.key_number, step_push)
                 if seq.playing:
                     pass
-                    # if not step_edited:
-                    #     # UI: if playing, step keys == toggles enable
-                    #     on = not on
-                    #     seq.steps[step_push] = (n,v,gate, on)
+                    if not step_edited:
+                        # UI: if playing, step keys == toggles enable (must be on relase)
+                        on = not on
+                        seq.steps[step_push] = (n,v,gate, on)
                 else:
                     # UI: if not playing, step key == play their pitches
                     (n,v,gate,on) = seq.steps[step_push]
-                    play_note_off( step_push, n, v, gate, True )
+                    play_note_off( n, v, gate, True )
                 sp_tmp = step_push
                 step_push = -1  # say we are done with key
                 step_edited = False  # done editing
