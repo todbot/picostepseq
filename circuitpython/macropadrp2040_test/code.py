@@ -28,7 +28,8 @@ import adafruit_macropad
 
 # local libraries in CIRCUITPY
 from sequencer import StepSequencer, ticks_ms, ticks_diff
-from sequencer_display_macropad import StepSequencerDisplay
+#from sequencer_display_macropad import StepSequencerDisplay
+from sequencer_display import StepSequencerDisplay
 
 playdebug = False
 
@@ -39,7 +40,7 @@ gate_default = 8    # ranges 0-15
 sequences = [ [(None)] * num_steps ] * num_steps  # pre-fill arrays for easy use later
 
 macropad = adafruit_macropad.MacroPad()
-macropad.display.rotation = 90
+display = macropad.display
 leds = macropad.pixels  # these are not pixels, they are LEDs. our screen has pixels
 leds.brightness = 0.2
 leds.auto_write = False
@@ -71,7 +72,6 @@ def sequence_load(seq_num):
 
 def sequence_save(seq_num):
     sequences[seq_num] = seqr.steps.copy()
-    print("sequences:",sequences)
 
 def sequences_read():
     global sequences
@@ -95,8 +95,8 @@ seqr = StepSequencer(num_steps, tempo, play_note_on, play_note_off, playing=Fals
 sequences_read()
 
 seqr_display = StepSequencerDisplay(seqr)
-
-macropad.display.show( seqr_display )
+display.rotation = seqr_display.rotation
+display.show(seqr_display)
 
 sequence_load(0)
 
@@ -139,8 +139,10 @@ while True:
 
     # UI: encoder push + hold step key = save sequence
     #print(encoder_push_millis, now-step_push_millis)
-    if encoder_push_millis > 0 and step_push_millis > 0 and now - step_push_millis > 1000:
-        seqr_display.update_ui_seqno(f"SAVE:{step_push}")
+    if encoder_push_millis > 0 and step_push_millis > 0:
+        if encoder_push_millis < step_push_millis:  # encoder pushed first
+            if now - step_push_millis > 1000:
+                seqr_display.update_ui_seqno(f"SAVE:{step_push}")
 
 
     # on encoder turn
