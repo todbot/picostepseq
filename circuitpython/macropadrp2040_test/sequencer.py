@@ -29,17 +29,17 @@ class StepSequencer:
         self.steps_per_beat = 4  # 16th note
         self.step_count = step_count
         #self.last_step = last_step   #  || step_count
-        self.i = 0
+        self.i = 0  # where in the sequence we currently are
         self.steps = [ (0,0,8,True) ] * step_count  # step "object" is tuple (note, vel, gate, on)
-        self.on_func = on_func
-        self.off_func = off_func
+        self.on_func = on_func    # callback to invoke when 'note on' should be sent
+        self.off_func = off_func  # callback to invoke when 'note off' should be sent
         self.set_tempo(tempo)
-        self.last_beat_millis = ticks_ms()
-        self.held_gate_millis = 0
-        self.held_note = (0,0)
+        self.last_beat_millis = ticks_ms()  # 'tempo' in our native tongue
+        self.held_gate_millis = 0  # when in the future our note off should occur
+        self.held_note = (0,0,0,0)  # the current note being on, to be turned off
         self.transpose = 0
-        self.playing = playing
-        self.seqno = seqno
+        self.playing = playing   # is sequence running or not (but use .play()/.pause())
+        self.seqno = seqno # an 'id' of what sequence it's currently playing
 
     def set_tempo(self,tempo):
         self.tempo = tempo
@@ -62,7 +62,7 @@ class StepSequencer:
             self.held_note = (note,vel,gate,on) # save for note off later
             self.held_gate_millis = now - err_t + ((self.beat_millis * gate) // 16) # gate ranges from 1-16
 
-        # FIXME: this is broken => stuck notes when params are changed
+        # after gate, turn off note
         if self.held_gate_millis != 0 and now > self.held_gate_millis:
             self.held_gate_millis = 0
             self.off_func( *self.held_note )
@@ -82,7 +82,7 @@ class StepSequencer:
         self.playing = False
 
     def play(self, play=True):
-        self.last_beat_millis = ticks_ms() - self.beat_millis
+        self.last_beat_millis = ticks_ms() - self.beat_millis # ensures we start on immediately
         self.playing = True
 
     def notenum_to_name(self,notenum, separator=""):

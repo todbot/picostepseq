@@ -1,4 +1,4 @@
-# macropadrp2040_step_sequencer_test.py --
+# picostepseq_test_code.py -- test framework for picostepseq
 # 6 Aug 2022 - @todbot / Tod Kurt
 # Part of picostepseq: https://github.com/todbot/picostepseq/
 #
@@ -7,12 +7,14 @@
 # - Tap encoder to toggle play / pause
 # - Turn encoder to change tranpose
 # - Push + turn encoder to change transpose
+# - Push encoder + push step key to load sequence 1-8
+# - Hold encoder + hold step key > 1 sec to save sequence 1-8
+# - Sequences saved to disk on pause
 # "Step key-first" actions:
 # - Tap step button to enable/disable from sequence
 # - Hold step button + turn encoder to change note
 # - Hold step button + push encoder + turn encoder to change gate length
 #
-
 
 # built in libraries
 import board
@@ -37,9 +39,10 @@ gate_default = 8    # ranges 0-15
 sequences = [ [(None)] * num_steps ] * num_steps  # pre-fill arrays for easy use later
 
 macropad = adafruit_macropad.MacroPad()
-macropad.pixels.brightness = 0.2
-macropad.pixels.auto_write = False
 macropad.display.rotation = 90
+leds = macropad.pixels  # these are not pixels, they are LEDs. our screen has pixels
+leds.brightness = 0.2
+leds.auto_write = False
 
 macropad._encoder_switch.deinit()  # so we can use keypad for debounce, like civilized folk
 encoder_switch = keypad.Keys((board.BUTTON,), value_when_pressed=False, pull=True)
@@ -61,13 +64,13 @@ def play_note_off(note, vel, gate, on):  #
     macropad.midi.send( macropad.NoteOff(note, vel), channel=0)
 
 def sequence_load(seq_num):
-    new_seq = sequences[seq_num]
-    print("new_seq=",new_seq)
+    new_seq = sequences[seq_num].copy()
+    print("new_seq:",new_seq)
     seqr.steps = new_seq
     seqr.seqno = seq_num
 
 def sequence_save(seq_num):
-    sequences[seq_num] = seqr.steps
+    sequences[seq_num] = seqr.steps.copy()
     print("sequences:",sequences)
 
 def sequences_read():
@@ -76,7 +79,13 @@ def sequences_read():
     with open('/saved_sequences.json', 'r') as fp:
         sequences = json.load(fp)
 
+last_write_time = ticks_ms()
 def sequences_write():
+    global last_write_time
+    if ticks_ms() - last_write_time < 5000: # only allow writes every 5 seconds
+        print("NO WRITE: TOO SOON")
+        return
+    last_write_time = ticks_ms()
     print("WRITING ALL SEQUENCES")
     with open('/saved_sequences.json', 'w') as fp:
         json.dump(sequences, fp)
@@ -112,8 +121,8 @@ while True:
         c = 0x000000 # turn LED off
         if i == seqr.i:  c = 0xff0000  # UI: bright red = indicate sequence position
         elif on:        c = 0x110000  # UI: dim red = indicate mute/unmute state
-        macropad.pixels[step_to_key_pos[i]] = c
-    macropad.pixels.show()
+        leds[step_to_key_pos[i]] = c
+    leds.show()
 
     seqr.update()
 
@@ -127,6 +136,12 @@ while True:
 
     # idea: pull out all UI options into state variables
     # encoder_push_and_turn_push = encoder_delta and encoder_push_millis > 0
+
+    # UI: encoder push + hold step key = save sequence
+    #print(encoder_push_millis, now-step_push_millis)
+    if encoder_push_millis > 0 and step_push_millis > 0 and now - step_push_millis > 1000:
+        seqr_display.update_ui_seqno(f"SAVE:{step_push}")
+
 
     # on encoder turn
     if encoder_delta:
@@ -225,27 +240,31 @@ while True:
                     if now - step_push_millis > 1000:
                         print("save sequence:", step_push)
                         sequence_save( step_push )
+                        seqr_display.update_ui_seqno()
                     # UI: encoder push + tap step key = load sequence
                     else:
                         print("load sequence:", step_push)
                         sequence_load( step_push )
                         seqr_display.update_ui_seqno()
                         seqr_display.update_ui_steps()
+                        (n,v,gate,on) = seqr.steps[step_push]
                 else:
                     if seqr.playing:
-                        if not step_edited:
+                        if step_edited:
+                            print("here")
+                        else:
                             # UI: if playing, step keys == toggles enable (must be on relase)
                             on = not on
-                            seqr.steps[step_push] = (n,v,gate, on)
+                            seqr.steps[step_push] = (n, v, gate, on)
                     else:
                         # UI: if not playing, step key == play their pitches
                         (n,v,gate,on) = seqr.steps[step_push]
                         play_note_off( n, v, gate, True )
 
-                sp_tmp = step_push  # for update_ui_step() below
+                seqr_display.update_ui_step( step_push, n, v, gate, on, False)
                 step_push = -1  # say we are done with key
-                step_edited = False  # done editing
-                seqr_display.update_ui_step( sp_tmp, n, v, gate, on)
+                step_push_millis = 0 # say we're done with key push
+                step_edited = False  # done editing  # FIXME we need all these vars? I think so
 
         except ValueError:  # undefined macropad key was pressed, ignore
             pass

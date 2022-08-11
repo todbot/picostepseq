@@ -72,8 +72,8 @@ class StepSequencerDisplay(displayio.Group):
     def update_ui_transpose(self):
         self.transpose_text.text = "trs:%+2d" % self.seq.transpose
 
-    def update_ui_seqno(self):
-        self.seqno_text.text = "seq:%1d" % self.seq.seqno
+    def update_ui_seqno(self, msg=None):
+        self.seqno_text.text = msg or f"seq: {self.seq.seqno}"
 
     def update_ui_all(self):
         self.update_ui_seqno()
