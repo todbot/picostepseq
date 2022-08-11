@@ -10,10 +10,6 @@ from adafruit_display_text import bitmap_label as label
 
 uidebug = False
 
-# old horizontal layout
-#step_text_pos = ( (0,10), (30,10), (60,10), (90,10),
-#                  (0,25), (30,25), (60,25), (90,25) )
-
 # vertical layout for MacroPadRP2040
 step_text_pos = ( (0,10), (16,10), (32,10), (48,10),
                   (0,45), (16,45), (32,45), (48,45)  )
@@ -27,6 +23,7 @@ gate_text_width, gate_text_height = (14,4)
 class StepSequencerDisplay(displayio.Group):
     def __init__(self, sequencer):
         super().__init__(x=0,y=0,scale=1)
+        self.rotation = 90   # macropad is played rotated
         self.seq = sequencer
         #main = displayio.Group()
         gate_pal = displayio.Palette(1)

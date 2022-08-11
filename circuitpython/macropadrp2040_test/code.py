@@ -28,8 +28,8 @@ import adafruit_macropad
 
 # local libraries in CIRCUITPY
 from sequencer import StepSequencer, ticks_ms, ticks_diff
-#from sequencer_display_macropad import StepSequencerDisplay
-from sequencer_display import StepSequencerDisplay
+from sequencer_display_macropad import StepSequencerDisplay
+#from sequencer_display import StepSequencerDisplay
 
 playdebug = False
 
@@ -66,7 +66,6 @@ def play_note_off(note, vel, gate, on):  #
 
 def sequence_load(seq_num):
     new_seq = sequences[seq_num].copy()
-    print("new_seq:",new_seq)
     seqr.steps = new_seq
     seqr.seqno = seq_num
 
