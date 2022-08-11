@@ -35,8 +35,8 @@ class StepSequencer:
         self.off_func = off_func
         self.set_tempo(tempo)
         self.last_beat_millis = ticks_ms()
-        self.next_gate_millis = 0
-        self.prev_note = (0,0)
+        self.held_gate_millis = 0
+        self.held_note = (0,0)
         self.transpose = 0
         self.playing = True
 
@@ -50,20 +50,21 @@ class StepSequencer:
         delta_t = now - self.last_beat_millis
         if self.playing and delta_t > self.beat_millis:
             self.i = (self.i + 1) % self.step_count
-            (note,vel,gate,on) = self.steps[self.i]
+            (note,vel,gate,on) = self.steps[self.i]  # get new note
             note += self.transpose
-            self.next_gate_millis = now + ((self.beat_millis * gate) // 16)  # gate ranges from 1-16
-            self.prev_note = (note,vel,gate,on) # save for note off
+            if self.held_gate_millis > 0:  # turn off pending note
+                print("HELD NOTE", self.held_note[0], now, self.held_gate_millis, delta_t)
+                self.off_func( *self.held_note )  # FIXME: why is this getting held?
             self.on_func(note, vel, gate, on)
             err_t = delta_t - self.beat_millis  # how much we are over
             self.last_beat_millis = now - err_t  # adjust for our overage
+            self.held_note = (note,vel,gate,on) # save for note off later
+            self.held_gate_millis = now - err_t + ((self.beat_millis * gate) // 16) # gate ranges from 1-16
 
         # FIXME: this is broken => stuck notes when params are changed
-        if now > self.next_gate_millis and self.next_gate_millis != 0:
-            self.next_gate_millis = 0
-            (onote, ovel, ogate, oon) = self.prev_note
-            (note, vel, gate, on) = self.steps[self.i]  # just for 'on' value
-            self.off_func(onote, ovel, ogate, on)
+        if self.held_gate_millis != 0 and now > self.held_gate_millis:
+            self.held_gate_millis = 0
+            self.off_func( *self.held_note )
 
     def toggle_play_pause(self):
         if self.playing:

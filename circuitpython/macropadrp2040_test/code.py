@@ -18,6 +18,7 @@
 import board
 import keypad
 import gc
+import json
 
 # installed via circup
 import adafruit_midi
@@ -33,6 +34,7 @@ base_note = 60  #  60 = C4, 48 = C3
 num_steps = 8
 tempo = 100
 gate_default = 8    # ranges 0-15
+sequences = [ [(None)] * num_steps ] * num_steps  # pre-fill arrays for easy use later
 
 macropad = adafruit_macropad.MacroPad()
 macropad.pixels.brightness = 0.2
@@ -58,28 +60,38 @@ def play_note_off(note, vel, gate, on):  #
     if playdebug: print("off:%d n:%3d v:%3d %d %d" % (note,vel, gate,on), end="\n" )
     macropad.midi.send( macropad.NoteOff(note, vel), channel=0)
 
-def load_sequence(stepi):
-    steps_new = [ (36 + (stepi*4), 127, 4, True) ] * 8
-    seq.steps = steps_new
+def load_sequence(seq_num):
+    new_seq = sequences[seq_num]
+    print("new_seq=",new_seq)
+    seqr.steps = new_seq
 
-seq = StepSequencer(num_steps, tempo, play_note_on, play_note_off)
+def save_sequence(seq_num):
+    sequences[seq_num] = seqr.steps
+    print("sequences:",sequences)
 
-seq_display = StepSequencerDisplay(seq)
+def read_sequences():
+    global sequences
+    with open('/saved_sequences.json', 'r') as fp:
+        sequences = json.load(fp)
 
-macropad.display.show( seq_display )
+def write_sequences():
+    print("SAVING ALL SEQUENCES")
+    with open('/saved_sequences.json', 'w') as fp:
+        json.dump(sequences, fp)
 
-saved_seqs = [
+seqr = StepSequencer(num_steps, tempo, play_note_on, play_note_off)
+seqr.playing = False
+read_sequences()
 
-]
+print("sequences:",sequences)
+seqr_display = StepSequencerDisplay(seqr)
 
-# init sequencer with saved / default
-for i in range(num_steps):
-    (n,v,gate,on) = (base_note, 127, gate_default, True)
-    seq.steps[ i ] = (n,v,gate,on)
-    seq_display.update_ui_step(i, n, v, gate, on, False)
+macropad.display.show( seqr_display )
+
+load_sequence(0)
 
 # init display UI
-seq_display.update_ui_all()
+seqr_display.update_ui_all()
 
 # various state for UI hanlding
 last_debug_millis = 0
@@ -95,14 +107,14 @@ while True:
 
     # update step LEDs
     for i in range(num_steps):
-        (n,v,gate,on) = seq.steps[ i ]
+        (n,v,gate,on) = seqr.steps[ i ]
         c = 0x000000 # turn LED off
-        if i == seq.i:  c = 0xff0000  # UI: bright red = indicate sequence position
+        if i == seqr.i:  c = 0xff0000  # UI: bright red = indicate sequence position
         elif on:        c = 0x110000  # UI: dim red = indicate mute/unmute state
         macropad.pixels[step_to_key_pos[i]] = c
     macropad.pixels.show()
 
-    seq.update()
+    seqr.update()
 
     now = ticks_ms()
 
@@ -120,40 +132,40 @@ while True:
 
         # UI: encoder turned and pushed while step key held == change step's gate
         if step_push > -1 and encoder_push_millis > 0:
-            (n,v,gate,on) = seq.steps[ step_push ]
+            (n,v,gate,on) = seqr.steps[ step_push ]
             gate = min(max(gate + encoder_delta, 1), 15)
-            seq.steps[ step_push ] = (n,v,gate,on)
+            seqr.steps[ step_push ] = (n,v,gate,on)
             step_edited = True
-            seq_display.update_ui_step( step_push, n, v, gate, on, True)
+            seqr_display.update_ui_step( step_push, n, v, gate, on, True)
             encoder_delta = 0  # we used up encoder delta
 
         # UI:  encoder turned while step key held == change step's note
         elif step_push > -1:  # step key pressed
-            (n,v,gate,on) = seq.steps[ step_push ]
-            if not seq.playing:
+            (n,v,gate,on) = seqr.steps[ step_push ]
+            if not seqr.playing:
                 play_note_off( n, v, gate, True)
 
             n = min(max(n + encoder_delta, 1), 127)
 
-            if not seq.playing:
+            if not seqr.playing:
                 play_note_on( n, v, gate, True )
 
-            seq.steps[ step_push ] = (n,v,gate,on)
+            seqr.steps[ step_push ] = (n,v,gate,on)
             step_edited = True
-            seq_display.update_ui_step( step_push, n, v, gate, on, True)
+            seqr_display.update_ui_step( step_push, n, v, gate, on, True)
             encoder_delta = 0  # we used up encoder delta
 
         # UI: encoder turned while encoder pushed == change tempo
         elif encoder_push_millis > 0:
             tempo = tempo + encoder_delta
-            seq.set_tempo(tempo)
-            seq_display.update_ui_tempo()
+            seqr.set_tempo(tempo)
+            seqr_display.update_ui_tempo()
             encoder_delta = 0  # we've used up the encoder delta
 
         # UI: encoder turned without any modifiers == change transpose
         else:
-            seq.transpose = min(max(seq.transpose + encoder_delta, -36), 36)
-            seq_display.update_ui_transpose()
+            seqr.transpose = min(max(seqr.transpose + encoder_delta, -36), 36)
+            seqr_display.update_ui_transpose()
             encoder_delta = 0  # we used up encoder delta
 
     # on encoder push
@@ -166,13 +178,15 @@ while True:
             if step_push == -1 and encoder_delta == 0:  # step key is not pressed and no turn
                 # UI: encoder tap, with no key == play/pause
                 if ticks_diff( ticks_ms(), encoder_push_millis) < 300:
-                    seq.toggle_play_pause()
-                    seq_display.update_ui_playing()
+                    seqr.toggle_play_pause()
+                    seqr_display.update_ui_playing()
+                    if not seqr.playing:
+                        write_sequences()
                 # UI encoder hold with no key == STOP and reset playhead to 0
                 # FIXME: broken. doesn't re-start at 0 properly
                 # elif ticks_diff( ticks_ms(), encoder_push_millis) > 1000:
-                #     seq.stop()
-                #     seq_display.update_ui_all()
+                #     seqr.stop()
+                #     seqr_display.update_ui_all()
             else:  # step key is pressed
                 pass
             encoder_push_millis = 0  # say we are done with encoder, on key release
@@ -185,21 +199,18 @@ while True:
             # record which step key is pushed for other UI modifiers
             # .index() throws the ValueError, thus the try/except
             step_push = step_to_key_pos.index(key.key_number) # map key pos back to step num
-            step_push_millis = ticks_ms()
-            (n,v,gate,on) = seq.steps[step_push]
+            (n,v,gate,on) = seqr.steps[step_push]
 
             if key.pressed:
                 print("+ press",key.key_number, step_push)
+                step_push_millis = ticks_ms()
 
                 # encoder push + key push = load/save sequence
                 if encoder_push_millis > 0:
-                    print("load sequence!")
-                    load_sequence( step_push )
-                    seq_display.update_ui_steps()
-
+                    pass
                 else:
-                    seq_display.update_ui_step( step_push, n, v, gate, on, True)
-                    if seq.playing:
+                    seqr_display.update_ui_step( step_push, n, v, gate, on, True)
+                    if seqr.playing:
                         pass
                     # UI: if not playing, step keys == play their pitches
                     else:
@@ -207,20 +218,33 @@ while True:
 
             elif key.released:
                 print("- release", key.key_number, step_push)
-                if seq.playing:
-                    pass
-                    if not step_edited:
-                        # UI: if playing, step keys == toggles enable (must be on relase)
-                        on = not on
-                        seq.steps[step_push] = (n,v,gate, on)
+
+                if encoder_push_millis > 0:   # UI load /save sequence mode
+                    # UI: encoder push + hold step key = save sequence
+                    if now - step_push_millis > 1000:
+                        print("save sequence!", step_push)
+                        save_sequence( step_push )
+                    # UI: encoder push + tap step key = load sequence
+                    else:
+                        print("load sequence!", step_push, (now - step_push_millis))
+                        load_sequence( step_push )
+                        seqr_display.update_ui_steps()
                 else:
-                    # UI: if not playing, step key == play their pitches
-                    (n,v,gate,on) = seq.steps[step_push]
-                    play_note_off( n, v, gate, True )
-                sp_tmp = step_push
+                    if seqr.playing:
+                        if not step_edited:
+                            # UI: if playing, step keys == toggles enable (must be on relase)
+                            on = not on
+                            seqr.steps[step_push] = (n,v,gate, on)
+                    else:
+                        # UI: if not playing, step key == play their pitches
+                        (n,v,gate,on) = seqr.steps[step_push]
+                        play_note_off( n, v, gate, True )
+
+                print("release done")
+                sp_tmp = step_push  # for update_ui_step() below
                 step_push = -1  # say we are done with key
                 step_edited = False  # done editing
-                seq_display.update_ui_step( sp_tmp, n, v, gate, on)
+                seqr_display.update_ui_step( sp_tmp, n, v, gate, on)
 
         except ValueError:  # undefined macropad key was pressed, ignore
             pass
