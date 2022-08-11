@@ -3,7 +3,7 @@
 # built-in libraries
 import time
 import board
-import digitalio
+import digitalio, pwmio
 import busio
 import keypad
 import rotaryio
@@ -28,12 +28,15 @@ midi_tx_pin, midi_rx_pin = board.GP16, board.GP17
 
 
 # create the objects handling those pin functions
-def make_led(p): po=digitalio.DigitalInOut(p); po.switch_to_output(); return po
+def make_led_digital(p): po=digitalio.DigitalInOut(p); po.switch_to_output(); return po
+def make_led(p): po = pwmio.PWMOut(p, frequency=25000, duty_cycle=0); return po
+
 keys = keypad.Keys(key_pins, value_when_pressed=False, pull=True)
 leds = [ make_led(p) for p in led_pins ]
+
 encoder = rotaryio.IncrementalEncoder(encoderA_pin, encoderB_pin)
 enctmp = digitalio.DigitalInOut(encoderSW_pin)
-enctmp.pull = digitalio.Pull.UP 
+enctmp.pull = digitalio.Pull.UP
 encoder_sw = adafruit_debouncer.Debouncer( enctmp )
 
 # midi setup
@@ -59,21 +62,34 @@ step_cnt = len(leds)
 
 last_time = 0
 led_i=0
+last_encoder_pos = encoder.position
+
 while True:
-    
+
+    for i in range(step_cnt):
+        leds[i].duty_cycle = max(leds[i].duty_cycle - 100, 0)
+
     if time.monotonic() - last_time > 0.2:
         last_time = time.monotonic()
-        leds[led_i].value = False
         led_i = (led_i + 1) % step_cnt
-        leds[led_i].value = True
+        leds[led_i].duty_cycle = 65535
         print("led_i",led_i, encoder.position)
 
     key = keys.events.get()
     if key:
         print("key:",key)
+        if key.pressed:
+            leds[key.key_number].duty_cycle = 65535
+
+    delta_pos = encoder.position - last_encoder_pos
+    if delta_pos:
+        text_area2.x = text_area2.x + 2*delta_pos
+        last_encoder_pos = encoder.position
 
     encoder_sw.update()
     if encoder_sw.fell:
         print("encoder sw fell")
+        text_area1.x = text_area1.x + 20
     if encoder_sw.rose:
         print("encoder sw rose")
+        text_area1.x = text_area1.x - 20
