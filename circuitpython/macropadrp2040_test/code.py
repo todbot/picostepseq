@@ -60,35 +60,36 @@ def play_note_off(note, vel, gate, on):  #
     if playdebug: print("off:%d n:%3d v:%3d %d %d" % (note,vel, gate,on), end="\n" )
     macropad.midi.send( macropad.NoteOff(note, vel), channel=0)
 
-def load_sequence(seq_num):
+def sequence_load(seq_num):
     new_seq = sequences[seq_num]
     print("new_seq=",new_seq)
     seqr.steps = new_seq
+    seqr.seqno = seq_num
 
-def save_sequence(seq_num):
+def sequence_save(seq_num):
     sequences[seq_num] = seqr.steps
     print("sequences:",sequences)
 
-def read_sequences():
+def sequences_read():
     global sequences
+    print("READING ALL SEQUENCES")
     with open('/saved_sequences.json', 'r') as fp:
         sequences = json.load(fp)
 
-def write_sequences():
-    print("SAVING ALL SEQUENCES")
+def sequences_write():
+    print("WRITING ALL SEQUENCES")
     with open('/saved_sequences.json', 'w') as fp:
         json.dump(sequences, fp)
 
-seqr = StepSequencer(num_steps, tempo, play_note_on, play_note_off)
-seqr.playing = False
-read_sequences()
+seqr = StepSequencer(num_steps, tempo, play_note_on, play_note_off, playing=False)
 
-print("sequences:",sequences)
+sequences_read()
+
 seqr_display = StepSequencerDisplay(seqr)
 
 macropad.display.show( seqr_display )
 
-load_sequence(0)
+sequence_load(0)
 
 # init display UI
 seqr_display.update_ui_all()
@@ -181,7 +182,7 @@ while True:
                     seqr.toggle_play_pause()
                     seqr_display.update_ui_playing()
                     if not seqr.playing:
-                        write_sequences()
+                        sequences_write()
                 # UI encoder hold with no key == STOP and reset playhead to 0
                 # FIXME: broken. doesn't re-start at 0 properly
                 # elif ticks_diff( ticks_ms(), encoder_push_millis) > 1000:
@@ -222,12 +223,13 @@ while True:
                 if encoder_push_millis > 0:   # UI load /save sequence mode
                     # UI: encoder push + hold step key = save sequence
                     if now - step_push_millis > 1000:
-                        print("save sequence!", step_push)
-                        save_sequence( step_push )
+                        print("save sequence:", step_push)
+                        sequence_save( step_push )
                     # UI: encoder push + tap step key = load sequence
                     else:
-                        print("load sequence!", step_push, (now - step_push_millis))
-                        load_sequence( step_push )
+                        print("load sequence:", step_push)
+                        sequence_load( step_push )
+                        seqr_display.update_ui_seqno()
                         seqr_display.update_ui_steps()
                 else:
                     if seqr.playing:
@@ -240,7 +242,6 @@ while True:
                         (n,v,gate,on) = seqr.steps[step_push]
                         play_note_off( n, v, gate, True )
 
-                print("release done")
                 sp_tmp = step_push  # for update_ui_step() below
                 step_push = -1  # say we are done with key
                 step_edited = False  # done editing

@@ -1,4 +1,4 @@
-# sequencer_display.py -- picostepseq displayio object for MacroPad RP2040
+# sequencer.py -- picostepseq sequencer object
 # 6 Aug 2022 - @todbot / Tod Kurt
 # Part of picostepseq : https://github.com/todbot/picostepseq/
 
@@ -25,7 +25,7 @@ def ticks_diff(t1,t2): return t1-t2
 #     #     self.on = on
 
 class StepSequencer:
-    def __init__(self, step_count, tempo, on_func, off_func):
+    def __init__(self, step_count, tempo, on_func, off_func, playing=False, seqno=0):
         self.steps_per_beat = 4  # 16th note
         self.step_count = step_count
         #self.last_step = last_step   #  || step_count
@@ -38,7 +38,8 @@ class StepSequencer:
         self.held_gate_millis = 0
         self.held_note = (0,0)
         self.transpose = 0
-        self.playing = True
+        self.playing = playing
+        self.seqno = seqno
 
     def set_tempo(self,tempo):
         self.tempo = tempo
@@ -73,7 +74,6 @@ class StepSequencer:
             self.play()
 
     def stop(self):  # FIXME: what about pending note
-        print("stop!")
         self.playing = False
         self.i = 0
         self.last_beat_millis = 0
@@ -85,11 +85,11 @@ class StepSequencer:
         self.last_beat_millis = ticks_ms() - self.beat_millis
         self.playing = True
 
-    def notenum_to_name(self,notenum):
+    def notenum_to_name(self,notenum, separator=""):
         octave = notenum // 12 - 1;
         n = notenum % 12
         note_names = ("C ","C#","D ", "D#", "E ", "F ", "F#", "G ", "G#", "A ", "A#", "B ")
-        return note_names[n] +"\n"+ str(octave)
+        return note_names[n] +separator+ str(octave)
 
 
 
