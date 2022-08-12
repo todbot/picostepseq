@@ -11,16 +11,19 @@ from adafruit_bitmap_font import bitmap_font
 
 uidebug = False
 
-# old horizontal layout
-step_text_pos = ( (10,10), (40,10), (70,10), (100,10),
-                  (10,33), (40,33), (70,33), (100,33) )
+step_text_pos = ( (10,12), (40,12), (70,12), (100,12),
+                  (10,35), (40,35), (70,35), (100,35) )
+#bpm_text_pos = (90, 57)
+#trans_text_pos = (45, 57)
+#seqno_text_pos = (0,57)
 bpm_text_pos = (0, 57)
 trans_text_pos = (55, 57)
+seqno_text_pos = (0, 48)
 play_text_pos = (110, 57)
-seqno_text_pos = (0,45)
-gate_text_offset = (0,-9)
-gate_text_width, gate_text_height = (14,4)
-edit_text_offset = (18,0)
+oct_text_offset = (15,3)
+gate_bar_offset = (0,-12)
+gate_bar_width, gate_bar_height = (14,4)
+edit_text_offset = (18,-3)
 
 class StepSequencerDisplay(displayio.Group):
     def __init__(self, sequencer):
@@ -28,20 +31,24 @@ class StepSequencerDisplay(displayio.Group):
         self.seq = sequencer
         gate_pal = displayio.Palette(1)
         gate_pal[0] = 0xffffff
-        self.stepgroup = displayio.Group()
+        self.notegroup = displayio.Group()
+        self.octgroup = displayio.Group()
         self.editgroup = displayio.Group()
         self.gategroup = displayio.Group()
-        self.append(self.stepgroup)
+        self.append(self.notegroup)
+        self.append(self.octgroup)
         self.append(self.editgroup)
         self.append(self.gategroup)
-        font = bitmap_font.load_font("ctrld-fixed-13b.pcf")
+        #font = bitmap_font.load_font("ctrld-fixed-13b.pcf")
+        font = bitmap_font.load_font("unscii-16.pcf")
         font2 = terminalio.FONT
         for (x,y) in step_text_pos:
-            self.stepgroup.append( label.Label(font, text="txt ", x=x, y=y, line_spacing=0.65))
+            self.notegroup.append( label.Label(font, text="A#", x=x, y=y, line_spacing=0.65))
+            self.octgroup.append( label.Label(font2, text="0", x=x+oct_text_offset[0], y=y+oct_text_offset[1]))
             self.editgroup.append( label.Label(font, text="*", x=x+edit_text_offset[0], y=y+edit_text_offset[1]))
             self.gategroup.append( vectorio.Rectangle(pixel_shader=gate_pal,
-                                                      width=gate_text_width, height=gate_text_height,
-                                                      x=x+gate_text_offset[0], y=y+gate_text_offset[1]))
+                                                      width=gate_bar_width, height=gate_bar_height,
+                                                      x=x+gate_bar_offset[0], y=y+gate_bar_offset[1]))
 
         self.seqno_text = label.Label(font2, text="seqno", x=seqno_text_pos[0], y=seqno_text_pos[1])
         self.tempo_text = label.Label(font2, text="tmpo", x=bpm_text_pos[0], y=bpm_text_pos[1])
@@ -57,13 +64,16 @@ class StepSequencerDisplay(displayio.Group):
             step = self.seq.i
             n,v,gate,on = self.seq.steps[step]
         if uidebug: print("udpate_disp_step:", step,n,v,gate,on )
-        notestr = self.seq.notenum_to_name(n)
+        (notename,octave) = self.seq.notenum_to_noteoct(n)
+        notestr = notename
+        octstr = str(octave)
         editstr = "." if selected else '*' if not on else ' '
-        step_str = "%3s" % notestr
-        if step_str != self.stepgroup[step].text:
-            self.stepgroup[step].text = step_str
+        if notestr != self.notegroup[step].text:
+            self.notegroup[step].text = notestr
+        if octstr != self.octgroup[step].text:
+            self.octgroup[step].text = octstr
         self.editgroup[step].text = editstr
-        self.gategroup[step].width = 1 + gate * gate_text_width // 16
+        self.gategroup[step].width = 1 + gate * gate_bar_width // 16
 
     def update_ui_steps(self):
         for i in range(self.seq.step_count):

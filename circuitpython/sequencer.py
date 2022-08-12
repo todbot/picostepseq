@@ -13,6 +13,8 @@ def ticks_diff(t1,t2): return t1-t2
 
 ###gate_default = 8  # == 50%  (ranges 0-15)
 
+note_names = ("C","C#","D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
+
 # class Step:
 #     note = 0
 #     vel = 0
@@ -85,8 +87,14 @@ class StepSequencer:
         self.last_beat_millis = ticks_ms() - self.beat_millis # ensures we start on immediately
         self.playing = True
 
-    def notenum_to_name(self,notenum, separator=""):
+    # return note and octave as string,int
+    def notenum_to_noteoct(self, notenum):
+        octave = notenum // 12 - 1;
+        notename = note_names[notenum % 12]
+        return (notename, octave)
+
+    # old
+    def notenum_to_name(self, notenum, separator=""):
         octave = notenum // 12 - 1;
         n = notenum % 12
-        note_names = ("C ","C#","D ", "D#", "E ", "F ", "F#", "G ", "G#", "A ", "A#", "B ")
         return note_names[n] +separator+ str(octave)
