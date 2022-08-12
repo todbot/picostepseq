@@ -77,7 +77,7 @@ encoder_switch = keypad.Keys((encoderSW_pin,), value_when_pressed=False, pull=Tr
 displayio.release_displays()
 
 dw,dh = 128,64
-oled_i2c = busio.I2C( scl=oled_scl_pin, sda=oled_sda_pin )
+oled_i2c = busio.I2C( scl=oled_scl_pin, sda=oled_sda_pin, frequency=400_000 )
 display_bus = displayio.I2CDisplay(oled_i2c, device_address=0x3C)  # or 0x3D depending on display
 display = adafruit_displayio_ssd1306.SSD1306(display_bus, width=dw, height=dh)
 
@@ -184,7 +184,7 @@ while True:
         led_set(i,c)
     leds_show()
 
-    seqr_display.update_ui_step( seqr.i, *seqr.steps[seqr.i] )
+    seqr_display.update_ui_step()
 
     now = ticks_ms()
 
@@ -308,7 +308,8 @@ while True:
                         print("load sequence:", step_push)
                         sequence_load( step_push )
                         seqr_display.update_ui_seqno()
-                        #seqr_display.update_ui_steps()
+                        if not seqr.playing:
+                            seqr_display.update_ui_steps() # causes too much lag when playing
                         (n,v,gate,on) = seqr.steps[step_push]
                 else:
                     if seqr.playing:

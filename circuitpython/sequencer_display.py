@@ -12,14 +12,15 @@ uidebug = False
 rotation = 0
 
 # old horizontal layout
-step_text_pos = ( (0,10), (30,10), (60,10), (90,10),
-                  (0,30), (30,30), (60,30), (90,30) )
+step_text_pos = ( (10,10), (40,10), (70,10), (100,10),
+                  (10,30), (40,30), (70,30), (100,30) )
 tempo_text_pos = (0, 57)
 trans_text_pos = (50, 57)
 seqno_text_pos = (0,45)
 play_text_pos = (100, 57)
 gate_text_offset = (0,-8)
 gate_text_width, gate_text_height = (14,4)
+edit_text_offset = (-5,0)
 
 class StepSequencerDisplay(displayio.Group):
     def __init__(self, sequencer):
@@ -30,12 +31,15 @@ class StepSequencerDisplay(displayio.Group):
         gate_pal = displayio.Palette(1)
         gate_pal[0] = 0xffffff
         self.stepgroup = displayio.Group()
+        self.editgroup = displayio.Group()
         self.gategroup = displayio.Group()
         self.append(self.stepgroup)
+        self.append(self.editgroup)
         self.append(self.gategroup)
         font = terminalio.FONT
         for (x,y) in step_text_pos:
             self.stepgroup.append( label.Label(font, text="txt ", x=x, y=y, line_spacing=0.65))
+            self.editgroup.append( label.Label(font, text="*", x=x+edit_text_offset[0], y=y+edit_text_offset[1]))
             self.gategroup.append( vectorio.Rectangle(pixel_shader=gate_pal,
                                                       width=gate_text_width, height=gate_text_height,
                                                       x=x+gate_text_offset[0], y=y+gate_text_offset[1]))
@@ -51,14 +55,15 @@ class StepSequencerDisplay(displayio.Group):
 
     def update_ui_step(self, step=None, n=0, v=127, gate=8, on=True, selected=False):
         if step is None:  # get current value
-            step = step.i
-            n,v,gate,on = seq.steps[step]
+            step = self.seq.i
+            n,v,gate,on = self.seq.steps[step]
         if uidebug: print("udpate_disp_step:", step,n,v,gate,on )
         notestr = self.seq.notenum_to_name(n)
         editstr = "." if selected else '*' if not on else ' '
-        step_str = "%3s%1s" % (notestr, editstr)
+        step_str = "%3s" % notestr
         if step_str != self.stepgroup[step].text:
             self.stepgroup[step].text = step_str
+        self.editgroup[step].text = editstr
         self.gategroup[step].width = 1 + gate * gate_text_width // 16
 
     def update_ui_steps(self):
