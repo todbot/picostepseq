@@ -17,25 +17,83 @@
 #
 
 # built in libraries
-#import board
-#import keypad
+import board
 import gc
 import json
+import usb_midi
 
 # installed via circup
-import adafruit_midi
+#import adafruit_midi
 
 # local libraries in CIRCUITPY
 from sequencer import StepSequencer, ticks_ms, ticks_diff
 
 if 'macropad' in board.board_id:
     from sequencer_display_macropad import StepSequencerDisplay
-    from sequencer_hardware_macropad import display, encoder, encoder_switch, keys, set_led, show_leds
+    from sequencer_hardware_macropad import StepSequencerHardware
+    # display, encoder, encoder_switch, keys, set_led, show_leds
     #import sequencer_hardware_macropad
 else:
     from sequencer_display import StepSequencerDisplay
-    from sequencer_hardware import display, encoder, encoder_switch, keys, set_led, show_leds
+    #from sequencer_hardware import display, encoder, encoder_switch, keys, led_set, leds_show
+    #from sequencer_hardware import Hardware
 
+
+
+import board
+import busio
+import pwmio
+import rotaryio
+import keypad
+import displayio
+import adafruit_displayio_ssd1306
+
+led_pins = (board.GP0, board.GP2, board.GP4, board.GP6,
+            board.GP8, board.GP10, board.GP12, board.GP14)
+
+key_pins = (board.GP1, board.GP3, board.GP5, board.GP7,
+            board.GP9, board.GP11, board.GP13, board.GP15)
+
+encoderA_pin, encoderB_pin, encoderSW_pin = board.GP18, board.GP19, board.GP22
+
+oled_sda_pin, oled_scl_pin = board.GP20, board.GP21
+
+midi_tx_pin, midi_rx_pin = board.GP16, board.GP17
+
+# KEYS
+keys = keypad.Keys(key_pins, value_when_pressed=False, pull=True)
+step_to_key_pos = (0,1,2,3,4,5,6,7)
+
+# LEDS
+# create the objects handling those pin functions
+def make_led(p): po = pwmio.PWMOut(p, frequency=25000, duty_cycle=0); return po
+leds = [ make_led(p) for p in led_pins ]
+
+# KNOB
+encoder = rotaryio.IncrementalEncoder(encoderA_pin, encoderB_pin)
+encoder_switch = keypad.Keys((encoderSW_pin,), value_when_pressed=False, pull=True)
+
+# DISPLAY
+displayio.release_displays()
+
+dw,dh = 128,64
+oled_i2c = busio.I2C( scl=oled_scl_pin, sda=oled_sda_pin )
+display_bus = displayio.I2CDisplay(oled_i2c, device_address=0x3C)  # or 0x3D depending on display
+display = adafruit_displayio_ssd1306.SSD1306(display_bus, width=dw, height=dh)
+
+usb_out = usb_midi.ports[1]
+
+# # uart midi setup
+# midi_timeout = 0.01
+# uart = busio.UART(tx=midi_tx_pin, rx=midi_rx_pin, baudrate=31250) # timeout=midi_timeout)
+
+# set LED brightness to value from 0-255
+def led_set(i,v):
+    leds[i].duty_cycle = v * 256  # duty_cycle 0-65535
+
+# refresh all LEDs (if meaningful)
+def leds_show():
+    pass
 
 
 playdebug = False
@@ -49,15 +107,17 @@ sequences = [ [(None)] * num_steps ] * num_steps  # pre-fill arrays for easy use
 
 # callback for sequencer
 def play_note_on(note, vel, gate, on):  #
-    if on:
-        if playdebug: print("on :%d n:%3d v:%3d %d %d" % (note,vel, gate,on), end="\n" )
-        #macropad.midi.send( macropad.NoteOn(note, vel), channel=0)
+    if not on: return
+    if playdebug: print("on :%d n:%3d v:%3d %d %d" % (note,vel, gate,on), end="\n" )
+    usb_out.write( bytearray([0x90, note, vel]) )  # FIXME
+    #macropad.midi.send( macropad.NoteOn(note, vel), channel=0)
 
 # callback for sequencer
 def play_note_off(note, vel, gate, on):  #
     #if on:
     # FIXME: always do note off to since race condition of note muted right after playing
     if playdebug: print("off:%d n:%3d v:%3d %d %d" % (note,vel, gate,on), end="\n" )
+    usb_out.write( bytearray([0x80, note, vel]))  # FIXME
     #macropad.midi.send( macropad.NoteOff(note, vel), channel=0)
 
 def sequence_load(seq_num):
@@ -85,12 +145,14 @@ def sequences_write():
     with open('/saved_sequences.json', 'w') as fp:
         json.dump(sequences, fp)
 
+#hardware = Hardware()
+
 seqr = StepSequencer(num_steps, tempo, play_note_on, play_note_off, playing=False)
 
 sequences_read()
 
 seqr_display = StepSequencerDisplay(seqr)
-display.rotation = seqr_display.rotation
+#display.rotation = seqr_display.rotation
 display.show(seqr_display)
 
 sequence_load(0)
@@ -107,19 +169,22 @@ step_push = -1  # which step button is being pushed, -1 == no push
 step_push_millis = 0  # when was a step button pushed (extra? maybe
 step_edited = False
 
+print("Ready.")
 while True:
     gc.collect()  # just to make the timing of this consistent
+
+    seqr.update()
 
     # update step LEDs
     for i in range(num_steps):
         (n,v,gate,on) = seqr.steps[ i ]
-        c = 0x000000 # turn LED off
-        if i == seqr.i:  c = 0xff0000  # UI: bright red = indicate sequence position
-        elif on:        c = 0x110000  # UI: dim red = indicate mute/unmute state
-        leds[step_to_key_pos[i]] = c
-    leds.show()
+        c = 0 # turn LED off
+        if i == seqr.i:  c = 0xff  # UI: bright red = indicate sequence position
+        elif on:         c = 0x11  # UI: dim red = indicate mute/unmute state
+        led_set(i,c)
+    leds_show()
 
-    seqr.update()
+    seqr_display.update_ui_step( seqr.i, *seqr.steps[seqr.i] )
 
     now = ticks_ms()
 
@@ -243,7 +308,7 @@ while True:
                         print("load sequence:", step_push)
                         sequence_load( step_push )
                         seqr_display.update_ui_seqno()
-                        seqr_display.update_ui_steps()
+                        #seqr_display.update_ui_steps()
                         (n,v,gate,on) = seqr.steps[step_push]
                 else:
                     if seqr.playing:
