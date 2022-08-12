@@ -33,14 +33,11 @@ from sequencer import StepSequencer, ticks_ms, ticks_diff
 
 if 'macropad' in board.board_id:
     from sequencer_display_macropad import StepSequencerDisplay
-    from sequencer_hardware_macropad import StepSequencerHardware
-    #import sequencer_hardware_macropad
+    from sequencer_hardware_macropad import Hardware
 else:
     from sequencer_display import StepSequencerDisplay
     from sequencer_hardware import Hardware
 
-
-usb_out = usb_midi.ports[1]
 
 playdebug = False
 
@@ -50,6 +47,8 @@ tempo = 100
 gate_default = 8    # ranges 0-15
 sequences = [ [(None)] * num_steps ] * num_steps  # pre-fill arrays for easy use later
 
+usb_out = usb_midi.ports[1]
+usb_in = usb_midi.ports[0]
 
 # callback for sequencer
 def play_note_on(note, vel, gate, on):  #
@@ -66,20 +65,24 @@ def play_note_off(note, vel, gate, on):  #
     usb_out.write( bytearray([0x80, note, vel]))  # FIXME
     #macropad.midi.send( macropad.NoteOff(note, vel), channel=0)
 
+# load a single sequence from RAM as current sequence
 def sequence_load(seq_num):
     new_seq = sequences[seq_num].copy()
     seqr.steps = new_seq
     seqr.seqno = seq_num
 
+# store a current sequence to RAM storage
 def sequence_save(seq_num):
     sequences[seq_num] = seqr.steps.copy()
 
+# read sequence set from disk into RAM
 def sequences_read():
     global sequences
     print("READING ALL SEQUENCES")
     with open('/saved_sequences.json', 'r') as fp:
         sequences = json.load(fp)
 
+# write sequence set from RAM to disk
 last_write_time = ticks_ms()
 def sequences_write():
     global last_write_time
@@ -107,14 +110,15 @@ seqr_display.update_ui_all()
 
 # various state for UI hanlding
 last_debug_millis = 0
-last_encoder_val = hw.encoder.position  # needed to calculate encoder_delta
+encoder_val_last = hw.encoder.position  # needed to calculate encoder_delta
 encoder_push_millis = 0  # when was encoder pushed, 0 == no push
-encoder_delta = 0 # how much encoder was turned, 0 == no turn
+encoder_delta = 0  # how much encoder was turned, 0 == no turn
 step_push = -1  # which step button is being pushed, -1 == no push
 step_push_millis = 0  # when was a step button pushed (extra? maybe
 step_edited = False
 
 print("Ready.")
+
 while True:
     gc.collect()  # just to make the timing of this consistent
 
@@ -123,9 +127,10 @@ while True:
     # update step LEDs
     for i in range(num_steps):
         (n,v,gate,on) = seqr.steps[ i ]
-        c = 0 # turn LED off
-        if i == seqr.i:  c = 0xff  # UI: bright red = indicate sequence position
-        elif on:         c = 0x11  # UI: dim red = indicate mute/unmute state
+        if i == seqr.i:  cmax = 255  # UI: bright red = indicate sequence position
+        elif on:         cmax = 10   # UI: dim red = indicate mute/unmute state
+        else:            cmax = 0    # UI: off = muted
+        c = max( hw.led_get(i) - 15, cmax)  # nice fade
         hw.led_set(i,c)
     hw.leds_show()
 
@@ -135,9 +140,9 @@ while True:
 
     # update encoder turning
     encoder_val = hw.encoder.position
-    if encoder_val != last_encoder_val:
-        encoder_delta = (encoder_val - last_encoder_val)
-        last_encoder_val = encoder_val
+    if encoder_val != encoder_val_last:
+        encoder_delta = (encoder_val - encoder_val_last)
+        encoder_val_last = encoder_val
 
     # idea: pull out all UI options into state variables
     # encoder_push_and_turn_push = encoder_delta and encoder_push_millis > 0

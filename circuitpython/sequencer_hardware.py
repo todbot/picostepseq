@@ -1,3 +1,7 @@
+# sequencer_hardware.py -- picostepseq hardware specific setup
+# 10 Aug 2022 - @todbot / Tod Kurt
+# Part of picostepseq : https://github.com/todbot/picostepseq/
+
 
 import board
 import busio
@@ -5,7 +9,6 @@ import pwmio
 import rotaryio
 import keypad
 import displayio
-import usb_midi
 import adafruit_displayio_ssd1306
 
 dw,dh = 128,64
@@ -45,11 +48,15 @@ class Hardware():
 
         # # uart midi setup
         # midi_timeout = 0.01
-        # uart = busio.UART(tx=midi_tx_pin, rx=midi_rx_pin, baudrate=31250) # timeout=midi_timeout)
+        # self.midi_uart = busio.UART(tx=midi_tx_pin, rx=midi_rx_pin, baudrate=31250) # timeout=midi_timeout)
 
     # set LED brightness to value from 0-255
     def led_set(self,i,v):
         self.leds[i].duty_cycle = v * 256  # duty_cycle 0-65535
+
+    # get LED brightness to value 0-255
+    def led_get(self,i):
+        return self.leds[i].duty_cycle // 256
 
     # refresh all LEDs (if meaningful)
     def leds_show(self):

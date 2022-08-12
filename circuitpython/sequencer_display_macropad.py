@@ -23,9 +23,7 @@ gate_text_width, gate_text_height = (14,4)
 class StepSequencerDisplay(displayio.Group):
     def __init__(self, sequencer):
         super().__init__(x=0,y=0,scale=1)
-        self.rotation = 90   # macropad is played rotated
         self.seq = sequencer
-        #main = displayio.Group()
         gate_pal = displayio.Palette(1)
         gate_pal[0] = 0xffffff
         self.stepgroup = displayio.Group()
