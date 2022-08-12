@@ -90,27 +90,3 @@ class StepSequencer:
         n = notenum % 12
         note_names = ("C ","C#","D ", "D#", "E ", "F ", "F#", "G ", "G#", "A ", "A#", "B ")
         return note_names[n] +separator+ str(octave)
-
-
-
-# if __name__ == "__main__":
-#     import time, random
-
-#     print("hello there")
-
-#     def play_note(step, note, vel):
-#         print("play: s:%d n:%3d v:%3d" % (step, note,vel) )
-
-#     seq = StepSequencer(8, 120, play_note)
-
-#     last_time = time.monotonic()
-#     while True:
-#         seq.update()
-
-#         if time.monotonic() - last_time > 5:
-#             last_time = time.monotonic()
-#             print("hi")
-#             ri = random.randint(0,8)
-#             rn = random.randint(30,50)
-#             rv = random.randint(30,120)
-#             seq[ri] = (rn, rv)

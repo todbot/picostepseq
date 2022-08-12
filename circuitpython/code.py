@@ -22,6 +22,9 @@ import gc
 import json
 import usb_midi
 
+import displayio
+displayio.release_displays()
+
 # installed via circup
 #import adafruit_midi
 
@@ -31,70 +34,13 @@ from sequencer import StepSequencer, ticks_ms, ticks_diff
 if 'macropad' in board.board_id:
     from sequencer_display_macropad import StepSequencerDisplay
     from sequencer_hardware_macropad import StepSequencerHardware
-    # display, encoder, encoder_switch, keys, set_led, show_leds
     #import sequencer_hardware_macropad
 else:
     from sequencer_display import StepSequencerDisplay
-    #from sequencer_hardware import display, encoder, encoder_switch, keys, led_set, leds_show
-    #from sequencer_hardware import Hardware
+    from sequencer_hardware import Hardware
 
-
-
-import board
-import busio
-import pwmio
-import rotaryio
-import keypad
-import displayio
-import adafruit_displayio_ssd1306
-
-led_pins = (board.GP0, board.GP2, board.GP4, board.GP6,
-            board.GP8, board.GP10, board.GP12, board.GP14)
-
-key_pins = (board.GP1, board.GP3, board.GP5, board.GP7,
-            board.GP9, board.GP11, board.GP13, board.GP15)
-
-encoderA_pin, encoderB_pin, encoderSW_pin = board.GP18, board.GP19, board.GP22
-
-oled_sda_pin, oled_scl_pin = board.GP20, board.GP21
-
-midi_tx_pin, midi_rx_pin = board.GP16, board.GP17
-
-# KEYS
-keys = keypad.Keys(key_pins, value_when_pressed=False, pull=True)
-step_to_key_pos = (0,1,2,3,4,5,6,7)
-
-# LEDS
-# create the objects handling those pin functions
-def make_led(p): po = pwmio.PWMOut(p, frequency=25000, duty_cycle=0); return po
-leds = [ make_led(p) for p in led_pins ]
-
-# KNOB
-encoder = rotaryio.IncrementalEncoder(encoderA_pin, encoderB_pin)
-encoder_switch = keypad.Keys((encoderSW_pin,), value_when_pressed=False, pull=True)
-
-# DISPLAY
-displayio.release_displays()
-
-dw,dh = 128,64
-oled_i2c = busio.I2C( scl=oled_scl_pin, sda=oled_sda_pin, frequency=400_000 )
-display_bus = displayio.I2CDisplay(oled_i2c, device_address=0x3C)  # or 0x3D depending on display
-display = adafruit_displayio_ssd1306.SSD1306(display_bus, width=dw, height=dh)
 
 usb_out = usb_midi.ports[1]
-
-# # uart midi setup
-# midi_timeout = 0.01
-# uart = busio.UART(tx=midi_tx_pin, rx=midi_rx_pin, baudrate=31250) # timeout=midi_timeout)
-
-# set LED brightness to value from 0-255
-def led_set(i,v):
-    leds[i].duty_cycle = v * 256  # duty_cycle 0-65535
-
-# refresh all LEDs (if meaningful)
-def leds_show():
-    pass
-
 
 playdebug = False
 
@@ -145,15 +91,14 @@ def sequences_write():
     with open('/saved_sequences.json', 'w') as fp:
         json.dump(sequences, fp)
 
-#hardware = Hardware()
+hw = Hardware()
 
 seqr = StepSequencer(num_steps, tempo, play_note_on, play_note_off, playing=False)
 
 sequences_read()
 
 seqr_display = StepSequencerDisplay(seqr)
-#display.rotation = seqr_display.rotation
-display.show(seqr_display)
+hw.display.show(seqr_display)
 
 sequence_load(0)
 
@@ -162,7 +107,7 @@ seqr_display.update_ui_all()
 
 # various state for UI hanlding
 last_debug_millis = 0
-last_encoder_val = encoder.position  # needed to calculate encoder_delta
+last_encoder_val = hw.encoder.position  # needed to calculate encoder_delta
 encoder_push_millis = 0  # when was encoder pushed, 0 == no push
 encoder_delta = 0 # how much encoder was turned, 0 == no turn
 step_push = -1  # which step button is being pushed, -1 == no push
@@ -181,15 +126,15 @@ while True:
         c = 0 # turn LED off
         if i == seqr.i:  c = 0xff  # UI: bright red = indicate sequence position
         elif on:         c = 0x11  # UI: dim red = indicate mute/unmute state
-        led_set(i,c)
-    leds_show()
+        hw.led_set(i,c)
+    hw.leds_show()
 
     seqr_display.update_ui_step()
 
     now = ticks_ms()
 
     # update encoder turning
-    encoder_val = encoder.position
+    encoder_val = hw.encoder.position
     if encoder_val != last_encoder_val:
         encoder_delta = (encoder_val - last_encoder_val)
         last_encoder_val = encoder_val
@@ -247,12 +192,14 @@ while True:
             encoder_delta = 0  # we used up encoder delta
 
     # on encoder push
-    encsw = encoder_switch.events.get()
+    encsw = hw.encoder_switch.events.get()
     if encsw:
         if encsw.pressed:
+            print("encoder_switch: press")
             encoder_push_millis = now  # save when we pushed encoder
 
         if encsw.released:
+            print("encoder_switch: release")
             if step_push == -1 and encoder_delta == 0:  # step key is not pressed and no turn
                 # UI: encoder tap, with no key == play/pause
                 if ticks_diff( ticks_ms(), encoder_push_millis) < 300:
@@ -271,16 +218,16 @@ while True:
 
 
     # on step key push
-    key = keys.events.get()
+    key = hw.keys.events.get()
     if key:
         try:
             # record which step key is pushed for other UI modifiers
             # .index() throws the ValueError, thus the try/except
-            step_push = step_to_key_pos.index(key.key_number) # map key pos back to step num
+            step_push = hw.step_to_key_pos.index(key.key_number) # map key pos back to step num
             (n,v,gate,on) = seqr.steps[step_push]
 
             if key.pressed:
-                print("+ press",key.key_number, step_push)
+                print("+ press", key.key_number, "step_push:",step_push)
                 step_push_millis = ticks_ms()
 
                 # encoder push + key push = load/save sequence
