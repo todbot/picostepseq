@@ -1,13 +1,12 @@
 import time, random
 import board, digitalio, busio
-import adafruit_midi
-from adafruit_midi.note_on import NoteOn
+#import adafruit_midi
+#from adafruit_midi.note_on import NoteOn
 
-midi_uart = busio.UART(tx=board.SDA, rx=board.SCL, baudrate=31250, timeout=0.01)
+midi_uart = busio.UART(tx=board.GP16, rx=board.GP17, baudrate=31250, timeout=0.01)
 #midi_serial = adafruit_midi.MIDI(midi_out=midi_uart)
 
 midi_out_buf = bytearray([0x90, 0, 0])
-#port_out.write(bytearray([smolmidi.NOTE_ON, 0x64, 0x42]))
 
 scale_lydian = [0, 2, 4, 6, 7, 9, 11]
 base_note = 48
@@ -16,6 +15,11 @@ import gc
 while True:
     st = time.monotonic()
     gc.collect()
+
+    bytes_in = midi_uart.read(30)
+    if bytes_in:
+        print("read bytes:",bytes_in)
+
     note_val =  base_note + scale_lydian[ random.randint(0,len(scale_lydian)-1) ]
     #print("note:",note_val)
 

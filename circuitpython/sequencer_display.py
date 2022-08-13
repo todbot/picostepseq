@@ -90,7 +90,7 @@ class StepSequencerDisplay(displayio.Group):
         self.transpose_text.text = "trs:%+2d" % self.seq.transpose
 
     def update_ui_seqno(self, msg=None):
-        self.seqno_text.text = msg or f"seq: {self.seq.seqno}"
+        self.seqno_text.text = msg or f"seq: {self.seq.seqno+1}"  # 1-index for humans, matches silkscreen
 
     def update_ui_all(self):
         self.update_ui_seqno()

@@ -38,6 +38,8 @@ else:
     from sequencer_display import StepSequencerDisplay
     from sequencer_hardware import Hardware
 
+do_usb_midi = False
+do_serial_midi = True
 
 playdebug = False
 
@@ -54,7 +56,9 @@ usb_in = usb_midi.ports[0]
 def play_note_on(note, vel, gate, on):  #
     if not on: return
     if playdebug: print("on :%d n:%3d v:%3d %d %d" % (note,vel, gate,on), end="\n" )
-    usb_out.write( bytearray([0x90, note, vel]) )  # FIXME
+    midi_msg = bytearray([0x90, note, vel])  # FIXME
+    if do_usb_midi: usb_out.write( midi_msg )
+    if do_serial_midi: hw.midi_uart.write( midi_msg )
     #macropad.midi.send( macropad.NoteOn(note, vel), channel=0)
 
 # callback for sequencer
@@ -62,7 +66,9 @@ def play_note_off(note, vel, gate, on):  #
     #if on:
     # FIXME: always do note off to since race condition of note muted right after playing
     if playdebug: print("off:%d n:%3d v:%3d %d %d" % (note,vel, gate,on), end="\n" )
-    usb_out.write( bytearray([0x80, note, vel]))  # FIXME
+    midi_msg = bytearray([0x80, note, vel])  # FIXME
+    if do_usb_midi: usb_out.write( midi_msg )
+    if do_serial_midi: hw.midi_uart.write( midi_msg )
     #macropad.midi.send( macropad.NoteOff(note, vel), channel=0)
 
 # load a single sequence from RAM as current sequence
@@ -255,6 +261,7 @@ while True:
                         print("save sequence:", step_push)
                         sequence_save( step_push )
                         seqr_display.update_ui_seqno()
+                        seqr_display.update_ui_step()
                     # UI: encoder push + tap step key = load sequence
                     else:
                         print("load sequence:", step_push)

@@ -56,7 +56,8 @@ class StepSequencer:
             (note,vel,gate,on) = self.steps[self.i]  # get new note
             note += self.transpose
             if self.held_gate_millis > 0:  # turn off pending note
-                print("HELD NOTE", self.held_note[0], now, self.held_gate_millis, delta_t)
+                print("HELD NOTE", self.notenum_to_name(self.held_note[0]), self.held_note[2],
+                      now, self.held_gate_millis, delta_t, self.beat_millis)
                 self.off_func( *self.held_note )  # FIXME: why is this getting held?
             self.on_func(note, vel, gate, on)
             err_t = delta_t - self.beat_millis  # how much we are over
