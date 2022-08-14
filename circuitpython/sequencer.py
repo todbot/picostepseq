@@ -50,8 +50,15 @@ class StepSequencer:
 
     def update(self):
         now = ticks_ms()
+        fudge = 1  # seems more like 3-10
         delta_t = now - self.last_beat_millis
-        if self.playing and delta_t > self.beat_millis:
+
+        # after gate, turn off note
+        if self.held_gate_millis != 0 and now >= self.held_gate_millis:
+            self.held_gate_millis = 0
+            self.off_func( *self.held_note )
+
+        if self.playing and delta_t >= self.beat_millis:
             self.i = (self.i + 1) % self.step_count
             (note,vel,gate,on) = self.steps[self.i]  # get new note
             note += self.transpose
@@ -61,14 +68,11 @@ class StepSequencer:
                 self.off_func( *self.held_note )  # FIXME: why is this getting held?
             self.on_func(note, vel, gate, on)
             err_t = delta_t - self.beat_millis  # how much we are over
-            self.last_beat_millis = now - err_t  # adjust for our overage
+            #print("err_t:",self.i, err_t)
+            self.last_beat_millis = now - err_t - fudge # adjust for our overage
             self.held_note = (note,vel,gate,on) # save for note off later
             self.held_gate_millis = now - err_t + ((self.beat_millis * gate) // 16) # gate ranges from 1-16
 
-        # after gate, turn off note
-        if self.held_gate_millis != 0 and now > self.held_gate_millis:
-            self.held_gate_millis = 0
-            self.off_func( *self.held_note )
 
     def toggle_play_pause(self):
         if self.playing:

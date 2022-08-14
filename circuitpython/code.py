@@ -1,4 +1,4 @@
-# picostepseq_test_code.py -- test framework for picostepseq
+# picostepseq_code.py -- picostepseq MIDI step sequencer
 # 6 Aug 2022 - @todbot / Tod Kurt
 # Part of picostepseq: https://github.com/todbot/picostepseq/
 #

@@ -35,10 +35,10 @@ else:
     trans_text_pos = (55, 57)
     seqno_text_pos = (0, 45)
     play_text_pos = (110, 57)
-    oct_text_offset = (0,12)  # four per line
+    oct_text_offset = (3,12)
     gate_bar_offset = (0,-12)
     gate_bar_width, gate_bar_height = (14,4)
-    edit_text_offset = (0,22)
+    edit_text_offset = (3,22)
 
 class StepSequencerDisplay(displayio.Group):
     def __init__(self, sequencer):
@@ -55,14 +55,15 @@ class StepSequencerDisplay(displayio.Group):
         self.append(self.editgroup)
         self.append(self.gategroup)
         #font = bitmap_font.load_font("ctrld-fixed-13b.pcf")
-        font = bitmap_font.load_font("unscii-16.pcf")
+        #font = bitmap_font.load_font("unscii-16.pcf")
+        font = bitmap_font.load_font("helvB12.bdf")
         # font = bitmap_font.load_font("ProggyTinySZ.pcf")
         #font = terminalio.FONT
         font2 = terminalio.FONT
         for (x,y) in step_text_pos:
             self.notegroup.append( label.Label(font, text="A#", x=x, y=y, line_spacing=0.65))
             self.octgroup.append( label.Label(font2, text="0", x=x+oct_text_offset[0], y=y+oct_text_offset[1]))
-            self.editgroup.append( label.Label(font, text="*", x=x+edit_text_offset[0], y=y+edit_text_offset[1]))
+            self.editgroup.append( label.Label(font2, text="*", x=x+edit_text_offset[0], y=y+edit_text_offset[1]))
             self.gategroup.append( vectorio.Rectangle(pixel_shader=gate_pal,
                                                       width=gate_bar_width, height=gate_bar_height,
                                                       x=x+gate_bar_offset[0], y=y+gate_bar_offset[1]))
@@ -84,7 +85,7 @@ class StepSequencerDisplay(displayio.Group):
         (notename,octave) = self.seq.notenum_to_noteoct(n)
         notestr = notename
         octstr = str(octave)
-        editstr = "." if selected else '*' if not on else ' '
+        editstr = "^" if selected else '*' if not on else ' '
         if notestr != self.notegroup[step].text:
             self.notegroup[step].text = notestr
         if octstr != self.octgroup[step].text:
