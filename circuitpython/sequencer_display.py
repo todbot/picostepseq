@@ -11,19 +11,34 @@ from adafruit_bitmap_font import bitmap_font
 
 uidebug = False
 
-step_text_pos = ( (10,12), (40,12), (70,12), (100,12),
-                  (10,35), (40,35), (70,35), (100,35) )
-#bpm_text_pos = (90, 57)
-#trans_text_pos = (45, 57)
-#seqno_text_pos = (0,57)
-bpm_text_pos = (0, 57)
-trans_text_pos = (55, 57)
-seqno_text_pos = (0, 48)
-play_text_pos = (110, 57)
-oct_text_offset = (15,3)
-gate_bar_offset = (0,-12)
-gate_bar_width, gate_bar_height = (14,4)
-edit_text_offset = (18,-3)
+four_per_line = False  # normally we do all 8 steps in one line
+
+if four_per_line:
+    step_text_pos = ( (10,12), (40,12), (70,12), (100,12),
+                      (10,35), (40,35), (70,35), (100,35) )
+    bpm_text_pos = (0, 57)
+    trans_text_pos = (55, 57)
+    seqno_text_pos = (0, 48)
+    play_text_pos = (110, 57)
+    oct_text_offset = (15,3)  # four per line
+    gate_bar_offset = (0,-12)
+    gate_bar_width, gate_bar_height = (14,4)
+    edit_text_offset = (18,-3)
+else:
+    # eight all across
+    step_text_pos = ( (0,12), (16,12), (32,12), (48,12),
+                      (64,12), (80,12), (96,12), (112,12) )
+    #bpm_text_pos = (90, 57)
+    #trans_text_pos = (45, 57)
+    #seqno_text_pos = (0,57)
+    bpm_text_pos = (0, 57)
+    trans_text_pos = (55, 57)
+    seqno_text_pos = (0, 45)
+    play_text_pos = (110, 57)
+    oct_text_offset = (0,12)  # four per line
+    gate_bar_offset = (0,-12)
+    gate_bar_width, gate_bar_height = (14,4)
+    edit_text_offset = (0,22)
 
 class StepSequencerDisplay(displayio.Group):
     def __init__(self, sequencer):
@@ -41,6 +56,8 @@ class StepSequencerDisplay(displayio.Group):
         self.append(self.gategroup)
         #font = bitmap_font.load_font("ctrld-fixed-13b.pcf")
         font = bitmap_font.load_font("unscii-16.pcf")
+        # font = bitmap_font.load_font("ProggyTinySZ.pcf")
+        #font = terminalio.FONT
         font2 = terminalio.FONT
         for (x,y) in step_text_pos:
             self.notegroup.append( label.Label(font, text="A#", x=x, y=y, line_spacing=0.65))

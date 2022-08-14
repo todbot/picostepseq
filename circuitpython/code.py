@@ -273,7 +273,7 @@ while True:
                 else:
                     if seqr.playing:
                         if step_edited:
-                            print("here")
+                            pass
                         else:
                             # UI: if playing, step keys == toggles enable (must be on relase)
                             on = not on
