@@ -66,15 +66,14 @@ def midi_receive():
         seqr.stop()
     elif msg.type == smolmidi.CLOCK:
         midiclk_cnt += 1
-        #if midiclk_cnt % 24 == 0:  # 24 pulses per quarter note
-        if midiclk_cnt % (24 * 4) == 1:  # 24 pulses er quarter note, 4 quarter notes per measure
+        if midiclk_cnt % 24 == 0:  # 24 pulses per quarter note
+        #if midiclk_cnt % (24 * 4) == 1:  # 24 pulses er quarter note, 4 quarter notes per measure
             now = ticks_ms()
-            #beat_millis = (now - midiclk_last_millis) / 24
-            beat_millis = (now - midiclk_last_millis) / 16
+            beat_millis = (now - midiclk_last_millis) / 4
+            #beat_millis = (now - midiclk_last_millis) / 16  # if one measure
             midiclk_last_millis = now
-            seqr.i=0
             seqr.beat_millis = beat_millis
-            #seqr.trigger(now, beat_millis)
+            seqr.trigger(now, beat_millis)
             print("!", beat_millis)
 
 # callback for sequencer

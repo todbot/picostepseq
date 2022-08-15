@@ -50,7 +50,7 @@ class StepSequencer:
 
     def trigger(self, now, delta_t):
         if not self.playing: return
-        fudge = 1  # seems more like 3-10
+        fudge = 0  # seems more like 3-10
         self.i = (self.i + 1) % self.step_count
         (note,vel,gate,on) = self.steps[self.i]  # get new note
         note += self.transpose
