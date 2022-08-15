@@ -47,7 +47,7 @@ class Hardware():
         self.display = adafruit_displayio_ssd1306.SSD1306(display_bus, width=dw, height=dh)
 
         # # uart midi setup
-        midi_timeout = 0.01
+        #midi_timeout = 0.01
         self.midi_uart = busio.UART(tx=midi_tx_pin, rx=midi_rx_pin, baudrate=31250) # timeout=midi_timeout)
 
     # set LED brightness to value from 0-255

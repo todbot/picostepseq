@@ -22,23 +22,20 @@ import gc
 import json
 import usb_midi
 
-import displayio
-displayio.release_displays()
-
-# installed via circup
-#import adafruit_midi
-
 # local libraries in CIRCUITPY
+import winterbloom_smolmidi as smolmidi
 from sequencer import StepSequencer, ticks_ms, ticks_diff
 
 if 'macropad' in board.board_id:
     from sequencer_display_macropad import StepSequencerDisplay
     from sequencer_hardware_macropad import Hardware
 else:
+    import displayio
+    displayio.release_displays() # can we put this in sequencer_hardware?
     from sequencer_display import StepSequencerDisplay
     from sequencer_hardware import Hardware
 
-do_usb_midi = False
+do_usb_midi = True
 do_serial_midi = True
 
 playdebug = False
@@ -51,6 +48,34 @@ sequences = [ [(None)] * num_steps ] * num_steps  # pre-fill arrays for easy use
 
 usb_out = usb_midi.ports[1]
 usb_in = usb_midi.ports[0]
+
+usb_midi_in = smolmidi.MidiIn(usb_in)
+
+
+midiclk_cnt = 0
+midiclk_last_millis = 0
+def midi_receive():
+    global midiclk_cnt, midiclk_last_millis
+    msg = usb_midi_in.receive()
+    if not msg: return
+    if msg.type == smolmidi.START:
+        print("MIDI START")
+        seqr.play()
+    elif msg.type == smolmidi.STOP:
+        print("MIDI STOP")
+        seqr.stop()
+    elif msg.type == smolmidi.CLOCK:
+        midiclk_cnt += 1
+        #if midiclk_cnt % 24 == 0:  # 24 pulses per quarter note
+        if midiclk_cnt % (24 * 4) == 1:  # 24 pulses er quarter note, 4 quarter notes per measure
+            now = ticks_ms()
+            #beat_millis = (now - midiclk_last_millis) / 24
+            beat_millis = (now - midiclk_last_millis) / 16
+            midiclk_last_millis = now
+            seqr.i=0
+            seqr.beat_millis = beat_millis
+            #seqr.trigger(now, beat_millis)
+            print("!", beat_millis)
 
 # callback for sequencer
 def play_note_on(note, vel, gate, on):  #
@@ -127,6 +152,8 @@ print("Ready.")
 
 while True:
     gc.collect()  # just to make the timing of this consistent
+
+    midi_receive()
 
     seqr.update()
 

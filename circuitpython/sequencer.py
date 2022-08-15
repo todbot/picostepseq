@@ -48,9 +48,25 @@ class StepSequencer:
         self.beat_millis = 60_000 // self.steps_per_beat // tempo
         print("seq.set_tempo: %6.2f %d" % (self.beat_millis, tempo) )
 
+    def trigger(self, now, delta_t):
+        if not self.playing: return
+        fudge = 1  # seems more like 3-10
+        self.i = (self.i + 1) % self.step_count
+        (note,vel,gate,on) = self.steps[self.i]  # get new note
+        note += self.transpose
+        if self.held_gate_millis > 0:  # turn off pending note
+            print("HELD NOTE", self.notenum_to_name(self.held_note[0]), self.held_note[2],
+                  now, self.held_gate_millis, delta_t, self.beat_millis)
+            self.off_func( *self.held_note )  # FIXME: why is this getting held?
+        self.on_func(note, vel, gate, on)
+        err_t = delta_t - self.beat_millis  # how much we are over
+        #print("err_t:",self.i, err_t)
+        self.last_beat_millis = now - err_t - fudge # adjust for our overage
+        self.held_note = (note,vel,gate,on) # save for note off later
+        self.held_gate_millis = now - err_t + ((self.beat_millis * gate) // 16) # gate ranges from 1-16
+
     def update(self):
         now = ticks_ms()
-        fudge = 1  # seems more like 3-10
         delta_t = now - self.last_beat_millis
 
         # after gate, turn off note
@@ -58,21 +74,8 @@ class StepSequencer:
             self.held_gate_millis = 0
             self.off_func( *self.held_note )
 
-        if self.playing and delta_t >= self.beat_millis:
-            self.i = (self.i + 1) % self.step_count
-            (note,vel,gate,on) = self.steps[self.i]  # get new note
-            note += self.transpose
-            if self.held_gate_millis > 0:  # turn off pending note
-                print("HELD NOTE", self.notenum_to_name(self.held_note[0]), self.held_note[2],
-                      now, self.held_gate_millis, delta_t, self.beat_millis)
-                self.off_func( *self.held_note )  # FIXME: why is this getting held?
-            self.on_func(note, vel, gate, on)
-            err_t = delta_t - self.beat_millis  # how much we are over
-            #print("err_t:",self.i, err_t)
-            self.last_beat_millis = now - err_t - fudge # adjust for our overage
-            self.held_note = (note,vel,gate,on) # save for note off later
-            self.held_gate_millis = now - err_t + ((self.beat_millis * gate) // 16) # gate ranges from 1-16
-
+        if delta_t >= self.beat_millis:
+            self.trigger(now, delta_t)
 
     def toggle_play_pause(self):
         if self.playing:
