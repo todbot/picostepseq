@@ -17,6 +17,7 @@ if four_per_line:
     step_text_pos = ( (10,12), (40,12), (70,12), (100,12),
                       (10,35), (40,35), (70,35), (100,35) )
     bpm_text_pos = (0, 57)
+    bpm_val_pos = (30, 57)
     trans_text_pos = (55, 57)
     seqno_text_pos = (0, 48)
     play_text_pos = (110, 57)
@@ -32,6 +33,7 @@ else:
     #trans_text_pos = (45, 57)
     #seqno_text_pos = (0,57)
     bpm_text_pos = (0, 57)
+    bpm_val_pos = (30, 57)
     trans_text_pos = (55, 57)
     seqno_text_pos = (0, 45)
     play_text_pos = (110, 57)
@@ -68,10 +70,12 @@ class StepSequencerDisplay(displayio.Group):
                                                       x=x+gate_bar_offset[0], y=y+gate_bar_offset[1]))
 
         self.seqno_text = label.Label(font2, text="seqno", x=seqno_text_pos[0], y=seqno_text_pos[1])
-        self.tempo_text = label.Label(font2, text="tmpo", x=bpm_text_pos[0], y=bpm_text_pos[1])
+        self.bpm_text = label.Label(font2, text="bpm:", x=bpm_text_pos[0], y=bpm_text_pos[1])
+        self.bpm_val = label.Label(font2, text="bpm:", x=bpm_val_pos[0], y=bpm_val_pos[1])
         self.transpose_text = label.Label(font2, text="trans", x=trans_text_pos[0], y=trans_text_pos[1])
         self.play_text = label.Label(font, text="||", x=play_text_pos[0], y=play_text_pos[1])
-        self.append(self.tempo_text)
+        self.append(self.bpm_text)
+        self.append(self.bpm_val)
         self.append(self.play_text)
         self.append(self.transpose_text)
         self.append(self.seqno_text)
@@ -97,8 +101,8 @@ class StepSequencerDisplay(displayio.Group):
             (n,v,gate,on) = self.seq.steps[i]
             self.update_ui_step(i, n, v, gate, on)
 
-    def update_ui_tempo(self):
-        self.tempo_text.text = "bpm:%d" % self.seq.tempo
+    def update_ui_bpm(self):
+        self.bpm_val.text = "%d" % self.seq.tempo  # just update the part that changes
 
     def update_ui_playing(self):
         self.play_text.text = " >" if self.seq.playing else "||"
@@ -111,7 +115,8 @@ class StepSequencerDisplay(displayio.Group):
 
     def update_ui_all(self):
         self.update_ui_seqno()
-        self.update_ui_tempo()
+        self.bpm_text.text = "bpm:"
+        self.update_ui_bpm()
         self.update_ui_playing()
         self.update_ui_transpose()
         self.update_ui_steps()
