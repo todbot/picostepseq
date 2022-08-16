@@ -3,6 +3,21 @@
 # Part of picostepseq: https://github.com/todbot/picostepseq/
 #
 # User interface:
+#
+# - Play / Pause -- tap encoder button
+# - Transpose sequence -- turn encoder knob
+# - Change tempo -- push + turn encoder knob
+#
+# - Mute / Unmute steps -- tap corresponding step key (while playing)
+# - Play notes -- tap corresponding step key (while paused)
+# - Change step pitch -- hold step key, turn encoder knob
+# - Change step gate -- hold step key, push + turn encoder knob
+# - Change sequence -- push encoder, tap step key 1-8, release encoder
+# - Save sequence -- push encoder, hold step key 1-8 for 2 secs, release encoder
+
+#
+# Or from the device point-of-view:
+#
 # "Encocder-first" actions:
 # - Tap encoder to toggle play / pause
 # - Turn encoder to change tranpose
