@@ -9,30 +9,27 @@ except (ImportError,NameError,NotImplementedError):
      from time import monotonic_ns as _monotonic_ns  # assume monotonic_ns() exists else we are lame
      def ticks_ms(): return _monotonic_ns() // 1_000_000  # stolen from adafruit_ticks
 
-def ticks_diff(t1,t2): return t1-t2
 
-###gate_default = 8  # == 50%  (ranges 0-15)
+def ticks_diff(t1,t2): return t1-t2
 
 note_names = ("C","C#","D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
 
+# maybe use this someday
 # class Step:
-#     note = 0
-#     vel = 0
-#     gate = 1  # ranges from 1-16
 #     on = True
-#     # def __init__(self, note,vel=127,on=True):
+#     # def __init__(self, note=0, vel=100, gate=8, on=True):
 #     #     self.note = note
 #     #     self.vel = vel
-#     #     self.gate = 0-1? or 0-15?
+#     #     self.gate = gate # 1-16
 #     #     self.on = on
 
 class StepSequencer:
     def __init__(self, step_count, tempo, on_func, off_func, playing=False, seqno=0):
+        self.ext_trigger = False  # midi clocked or not
         self.steps_per_beat = 4  # 16th note
         self.step_count = step_count
-        #self.last_step = last_step   #  || step_count
         self.i = 0  # where in the sequence we currently are
-        self.steps = [ (0,0,8,True) ] * step_count  # step "object" is tuple (note, vel, gate, on)
+        self.steps = [ (0,100,8,True) ] * step_count  # list of step "objects", i.e. tuple (note, vel, gate, on)
         self.on_func = on_func    # callback to invoke when 'note on' should be sent
         self.off_func = off_func  # callback to invoke when 'note off' should be sent
         self.set_tempo(tempo)
@@ -43,39 +40,66 @@ class StepSequencer:
         self.playing = playing   # is sequence running or not (but use .play()/.pause())
         self.seqno = seqno # an 'id' of what sequence it's currently playing
 
-    def set_tempo(self,tempo):
-        self.tempo = tempo
+    @property
+    def tempo(self):  # really just used for display purposes
+        return 60_000 // self.beat_millis // self.steps_per_beat
+
+    def set_tempo(self, tempo):
+        """Sets the internal tempo. beat_millis is 1/16th note time in milliseconds"""
         self.beat_millis = 60_000 // self.steps_per_beat // tempo
         print("seq.set_tempo: %6.2f %d" % (self.beat_millis, tempo) )
 
+    def trigger_next(self, now):
+        """Trigger next step in sequence (and thus make externally triggered)"""
+        self.ext_trigger = True
+        self.trigger(now, self.beat_millis)
+
     def trigger(self, now, delta_t):
-        if not self.playing: return
+        if not self.playing:
+            return
         fudge = 0  # seems more like 3-10
+
+        # go to next step in sequence, get new note, transpose if needed
         self.i = (self.i + 1) % self.step_count
-        (note,vel,gate,on) = self.steps[self.i]  # get new note
+        (note,vel,gate,on) = self.steps[self.i]
         note += self.transpose
-        if self.held_gate_millis > 0:  # turn off pending note
+
+        # turn off any pending note (should've been turned off, but this is just in case)
+        if self.held_gate_millis > 0:
             print("HELD NOTE", self.notenum_to_name(self.held_note[0]), self.held_note[2],
                   now, self.held_gate_millis, delta_t, self.beat_millis)
             self.off_func( *self.held_note )  # FIXME: why is this getting held?
+
+        # trigger new note
         self.on_func(note, vel, gate, on)
+
+        # calculate next note timing and held note timing
         err_t = delta_t - self.beat_millis  # how much we are over
-        #print("err_t:",self.i, err_t)
+        print("err_t:",self.i, err_t, self.beat_millis)
         self.last_beat_millis = now - err_t - fudge # adjust for our overage
         self.held_note = (note,vel,gate,on) # save for note off later
-        self.held_gate_millis = now - err_t + ((self.beat_millis * gate) // 16) # gate ranges from 1-16
+        self.held_gate_millis = now + ((self.beat_millis * gate) // 16) - err_t # gate ranges from 1-16
 
     def update(self):
-        now = ticks_ms()
-        delta_t = now - self.last_beat_millis
+        """Update state of sequencer. Must be called regularly in main"""
 
-        # after gate, turn off note
+        now = ticks_ms()
+        delta_t = now - self.last_beat_millis  # FIXME: better name, 'real_beat_millis'?
+
+        # turn off note if it is done
         if self.held_gate_millis != 0 and now >= self.held_gate_millis:
             self.held_gate_millis = 0
             self.off_func( *self.held_note )
 
+        # if time for new note, trigger it
         if delta_t >= self.beat_millis:
-            self.trigger(now, delta_t)
+            if not self.ext_trigger:
+                self.trigger(now, delta_t)
+            else:
+                # fall back to internal triggering if not externally clocked for a while
+                if delta_t > self.beat_millis * 4:
+                    self.ext_trigger = False
+                    print("Turning EXT TRIGGER off")
 
     def toggle_play_pause(self):
         if self.playing:
@@ -95,13 +119,13 @@ class StepSequencer:
         self.last_beat_millis = ticks_ms() - self.beat_millis # ensures we start on immediately
         self.playing = True
 
-    # return note and octave as string,int
     def notenum_to_noteoct(self, notenum):
+        """Return note and octave as (string,int) tuple"""
         octave = notenum // 12 - 1;
         notename = note_names[notenum % 12]
         return (notename, octave)
 
-    # old
+    # old do not use
     def notenum_to_name(self, notenum, separator=""):
         octave = notenum // 12 - 1;
         n = notenum % 12

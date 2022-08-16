@@ -44,7 +44,10 @@ base_note = 60  #  60 = C4, 48 = C3
 num_steps = 8
 tempo = 100
 gate_default = 8    # ranges 0-15
+
+# array of sequences used by Sequencer (which only knows about one sequence)
 sequences = [ [(None)] * num_steps ] * num_steps  # pre-fill arrays for easy use later
+
 
 usb_out = usb_midi.ports[1]
 usb_in = usb_midi.ports[0]
@@ -55,74 +58,87 @@ usb_midi_in = smolmidi.MidiIn(usb_in)
 midiclk_cnt = 0
 midiclk_last_millis = 0
 def midi_receive():
+    """Handle MIDI Clock and Start/Stop"""
     global midiclk_cnt, midiclk_last_millis
+
     msg = usb_midi_in.receive()
+
     if not msg: return
+
     if msg.type == smolmidi.START:
         print("MIDI START")
         seqr.play()
+        seqr_display.update_ui_playing()
+
     elif msg.type == smolmidi.STOP:
         print("MIDI STOP")
         seqr.stop()
+        seqr_display.update_ui_playing()
+
     elif msg.type == smolmidi.CLOCK:
         midiclk_cnt += 1
-        if midiclk_cnt % 24 == 0:  # 24 pulses per quarter note
-        #if midiclk_cnt % (24 * 4) == 1:  # 24 pulses er quarter note, 4 quarter notes per measure
+        if midiclk_cnt % 6 == 0:  # once every 1/16th note (24 pulses per quarter note => 6 pulses per 16th note)
             now = ticks_ms()
-            beat_millis = (now - midiclk_last_millis) / 4
-            #beat_millis = (now - midiclk_last_millis) / 16  # if one measure
-            midiclk_last_millis = now
-            seqr.beat_millis = beat_millis
-            seqr.trigger(now, beat_millis)
-            print("!", beat_millis)
+            seqr.trigger_next(now)
 
-# callback for sequencer
+            #print("!", beat_millis)
+            if midiclk_cnt % 24 == 0:  # once every quarter note
+                beat_millis = (now - midiclk_last_millis) / 4  # beat_millis is 1/16th note time
+                midiclk_last_millis = now
+                seqr.beat_millis = beat_millis
+                seqr_display.update_ui_bpm()
+                seqr_display.update_ui_playing()
+
+
 def play_note_on(note, vel, gate, on):  #
+    """Callback for sequencer when note should be tured on"""
     if not on: return
     if playdebug: print("on :%d n:%3d v:%3d %d %d" % (note,vel, gate,on), end="\n" )
     midi_msg = bytearray([0x90, note, vel])  # FIXME
-    if do_usb_midi: usb_out.write( midi_msg )
-    if do_serial_midi: hw.midi_uart.write( midi_msg )
-    #macropad.midi.send( macropad.NoteOn(note, vel), channel=0)
+    if do_usb_midi:
+        usb_out.write( midi_msg )
+    if do_serial_midi:
+        hw.midi_uart.write( midi_msg )
 
-# callback for sequencer
 def play_note_off(note, vel, gate, on):  #
-    #if on:
-    # FIXME: always do note off to since race condition of note muted right after playing
+    """Callback for sequencer when note should be tured off"""
+    #if on: # FIXME: always do note off to since race condition of note muted right after playing
     if playdebug: print("off:%d n:%3d v:%3d %d %d" % (note,vel, gate,on), end="\n" )
     midi_msg = bytearray([0x80, note, vel])  # FIXME
-    if do_usb_midi: usb_out.write( midi_msg )
-    if do_serial_midi: hw.midi_uart.write( midi_msg )
-    #macropad.midi.send( macropad.NoteOff(note, vel), channel=0)
+    if do_usb_midi:
+        usb_out.write( midi_msg )
+    if do_serial_midi:
+        hw.midi_uart.write( midi_msg )
 
-# load a single sequence from RAM as current sequence
 def sequence_load(seq_num):
+    """Load a single sequence into the sequencer from RAM storage"""
     new_seq = sequences[seq_num].copy()
     seqr.steps = new_seq
     seqr.seqno = seq_num
 
-# store a current sequence to RAM storage
 def sequence_save(seq_num):
+    """Store current sequence in sequencer to RAM storage"""
     sequences[seq_num] = seqr.steps.copy()
 
-# read sequence set from disk into RAM
 def sequences_read():
+    """Read entire sequence set from disk into RAM"""
     global sequences
     print("READING ALL SEQUENCES")
     with open('/saved_sequences.json', 'r') as fp:
         sequences = json.load(fp)
 
-# write sequence set from RAM to disk
 last_write_time = ticks_ms()
 def sequences_write():
+    """Write  entire sequence set from RAM to disk"""
     global last_write_time
-    if ticks_ms() - last_write_time < 5000: # only allow writes every 5 seconds
+    if ticks_ms() - last_write_time < 20000: # only allow writes every 10 seconds
         print("NO WRITE: TOO SOON")
         return
     last_write_time = ticks_ms()
     print("WRITING ALL SEQUENCES")
     with open('/saved_sequences.json', 'w') as fp:
         json.dump(sequences, fp)
+
 
 hw = Hardware()
 
@@ -138,7 +154,7 @@ sequence_load(0)
 # init display UI
 seqr_display.update_ui_all()
 
-# various state for UI hanlding
+# various state for UI handling
 last_debug_millis = 0
 encoder_val_last = hw.encoder.position  # needed to calculate encoder_delta
 encoder_push_millis = 0  # when was encoder pushed, 0 == no push
@@ -219,7 +235,7 @@ while True:
         elif encoder_push_millis > 0:
             tempo = tempo + encoder_delta
             seqr.set_tempo(tempo)
-            seqr_display.update_ui_tempo()
+            seqr_display.update_ui_bpm()
             encoder_delta = 0  # we've used up the encoder delta
 
         # UI: encoder turned without any modifiers == change transpose
@@ -239,7 +255,7 @@ while True:
             print("encoder_switch: release")
             if step_push == -1 and encoder_delta == 0:  # step key is not pressed and no turn
                 # UI: encoder tap, with no key == play/pause
-                if ticks_diff( ticks_ms(), encoder_push_millis) < 300:
+                if ticks_ms() - encoder_push_millis < 300:
                     seqr.toggle_play_pause()
                     seqr_display.update_ui_playing()
                     if not seqr.playing:
