@@ -36,6 +36,7 @@ class Hardware():
         # LEDS
         # create the objects handling those pin functions
         self.leds = [ make_led(p) for p in led_pins ]
+        self.leds_fade_amount = 30
 
         # KNOB
         self.encoder = rotaryio.IncrementalEncoder(encoderA_pin, encoderB_pin)

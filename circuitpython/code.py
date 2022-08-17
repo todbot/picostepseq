@@ -42,12 +42,12 @@ import winterbloom_smolmidi as smolmidi
 from sequencer import StepSequencer, ticks_ms, ticks_diff
 
 if 'macropad' in board.board_id:
-    from sequencer_display_macropad import StepSequencerDisplay
+    from sequencer_display_macropad import SequencerDisplayMacroPad as SequencerDisplay
     from sequencer_hardware_macropad import Hardware
 else:
     import displayio
     displayio.release_displays() # can we put this in sequencer_hardware?
-    from sequencer_display import StepSequencerDisplay
+    from sequencer_display import SequencerDisplay
     from sequencer_hardware import Hardware
 
 do_usb_midi = True
@@ -161,7 +161,7 @@ seqr = StepSequencer(num_steps, tempo, play_note_on, play_note_off, playing=Fals
 
 sequences_read()
 
-seqr_display = StepSequencerDisplay(seqr)
+seqr_display = SequencerDisplay(seqr)
 hw.display.show(seqr_display)
 
 sequence_load(0)
@@ -191,9 +191,9 @@ while True:
     for i in range(num_steps):
         (n,v,gate,on) = seqr.steps[ i ]
         if i == seqr.i:  cmax = 255  # UI: bright red = indicate sequence position
-        elif on:         cmax = 10   # UI: dim red = indicate mute/unmute state
+        elif on:         cmax = 20   # UI: dim red = indicate mute/unmute state
         else:            cmax = 0    # UI: off = muted
-        c = max( hw.led_get(i) - 15, cmax)  # nice fade
+        c = max( hw.led_get(i) - hw.leds_fade_amount, cmax)  # nice fade
         hw.led_set(i,c)
     hw.leds_show()
 

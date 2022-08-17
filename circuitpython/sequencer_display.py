@@ -43,6 +43,9 @@ class StepSequencerDisplay(displayio.Group):
     def __init__(self, sequencer):
         super().__init__(x=0,y=0,scale=1)
         self.seq = sequencer
+        self.setup()
+
+    def setup(self):
         gate_pal = displayio.Palette(1)
         gate_pal[0] = 0xffffff
         self.notegroup = displayio.Group()

@@ -3,13 +3,14 @@
 # Part of picostepseq : https://github.com/todbot/picostepseq/
 
 import board
+import busio
 import rotaryio
 import keypad
 import neopixel
 
 dw,dh = 128,64
 
-key_pins = [getattr(board, "KEY%d" % (num + 1)) for num in order]
+key_pins = [getattr(board, "KEY%d" % (num + 1)) for num in range(0,12)]
 
 encoderA_pin, encoderB_pin, encoderSW_pin = board.ROTA, board.ROTB, board.BUTTON
 
@@ -25,26 +26,29 @@ class Hardware():
         self.leds = neopixel.NeoPixel(board.NEOPIXEL, 12)
         self.leds.brightness = 0.2
         self.leds.auto_write = False
+        self.leds_fade_amount = 50
 
         # KNOB
-        self.encoder = rotaryio.IncrementalEncoder(encoderA_pin, encoderB_pin)
+        self.encoder = rotaryio.IncrementalEncoder(encoderB_pin, encoderA_pin)  # yes, reversed
         self.encoder_switch = keypad.Keys((encoderSW_pin,), value_when_pressed=False, pull=True)
 
         # DISPLAY
         self.display = board.DISPLAY
         self.display.rotation = 90
 
-        # # uart midi setup
-        # midi_timeout = 0.01
-        # self.midi_uart = busio.UART(tx=midi_tx_pin, rx=midi_rx_pin, baudrate=31250) # timeout=midi_timeout)
+        # uart midi setup
+        self.midi_uart = busio.UART(tx=midi_tx_pin, rx=midi_rx_pin, baudrate=31250) # timeout=midi_timeout)
 
     # set LED brightness to value from 0-255
     def led_set(self,i,v):
-        self.leds[i] = (v, 0,0)
+        #print("i",i)
+        self.leds[ self.step_to_key_pos[i] ] = (v, 0,0)
+        #self.leds[ i ] = (v, 0,0)
 
     # get LED brightness to value 0-255
     def led_get(self,i):
-        c = self.leds[i]
+        c = self.leds[ self.step_to_key_pos[i] ]
+        #c = self.leds[ i ]
         return c[0]
 
     # refresh all LEDs (if meaningful)
