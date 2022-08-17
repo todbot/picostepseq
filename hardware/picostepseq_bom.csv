@@ -1,0 +1,13 @@
+"Qty";"Value";"Device";"Package";"Parts";"Description";"CUI_PURCHASE_URL";"DESCRIPTION";"DIGI-KEY_PART_NUMBER";"MF";"MP";"MPN";"OC_FARNELL";"OC_NEWARK";"PACKAGE";"POPULARITY";"PURCHASE-URL";"SPICEPREFIX";
+"1";"";"C-EU025-025X050";"C025-025X050";"C1";"CAPACITOR, European symbol";"";"";"";"";"";"";"";"";"";"65";"";"C";
+"1";"";"RASPBERRY_PICO-NO_DEBUG";"PICO-PKG-NO_DEBUG";"U1";"";"";"";"";"";"";"";"";"";"";"";"";"";
+"1";"10";"R-EU_0204/7";"0204/7";"R1";"RESISTOR, European symbol";"";"";"";"";"";"";"";"";"";"79";"";"R";
+"8";"1k";"R-EU_0204/7";"0204/7";"R11, R12, R13, R14, R15, R16, R17, R18";"RESISTOR, European symbol";"";"";"";"";"";"";"";"";"";"79";"";"R";
+"1";"220";"R-EU_0204/7";"0204/7";"R3";"RESISTOR, European symbol";"";"";"";"";"";"";"";"";"";"79";"";"R";
+"1";"33";"R-EU_0204/7";"0204/7";"R2";"RESISTOR, European symbol";"";"";"";"";"";"";"";"";"";"79";"";"R";
+"1";"4.70k";"R-EU_0204/7";"0204/7";"R4";"RESISTOR, European symbol";"";"";"";"";"";"";"";"";"";"79";"";"R";
+"1";"6N137";"6N137";"DIL08";"U2";"MOTOROLA OPTO COUPLER";"";"";"";"";"";"6N137";"1328376";"52M1895";"";"2";"";"";
+"1";"DISPLAY-OLED-128X64-I2C";"DISPLAY-OLED-128X64-I2C";"DISPLAY-OLED-128X64-I2C";"DISP";"128x64 Dot Matrix OLED Module based on SSD1306 chip";"";"";"";"";"";"";"";"";"";"";"";"";
+"8";"LED_SWITCHSTEP";"LED_SWITCHSTEP";"LED_SWITCH_STEP";"SW1, SW2, SW3, SW4, SW5, SW6, SW7, SW8";"Step switch with LED, like on old drum machines";"";"";"";"";"";"";"";"";"";"";"";"";
+"1";"PEC11";"ENCODER_PLUS_SWITCH_BOURNS_PEC11";"PEC11+SWITCH";"ENC1";"Rotary Encoder with Built-In Switch";"";"";"";"";"";"";"";"";"";"";"";"";
+"2";"SJ-3523-SMT";"SJ-3523-SMT";"CUI_SJ-3523-SMT";"J1, J2";"Audio Jack Connector 3.5 mm Low Profile Surface Mount Stereo Jack, 3 Pin Right-Angle";"https://www.cuidevices.com/product/interconnect/connectors/audio-connectors/jacks/sj-352x-smt-series?utm_source=snapeda.com&utm_medium=referral&utm_campaign=snapedaBOM";"3.5 mm, Stereo, Right Angle, Surface Mount (SMT), 3 Conductors, 0~1 Internal Switches, Audio Jack Connector";"CP-3523SJCT-ND";"CUI Devices";"SJ-3523-SMT-TR";"";"";"";"None";"";"https://pricing.snapeda.com/search/part/SJ-3523-SMT-TR/?ref=eda";"";
