@@ -17,7 +17,7 @@ if four_per_line:
     step_text_pos = ( (10,12), (40,12), (70,12), (100,12),
                       (10,35), (40,35), (70,35), (100,35) )
     bpm_text_pos = (0, 57)
-    bpm_val_pos = (30, 57)
+    bpm_val_pos = (25, 57)
     trans_text_pos = (55, 57)
     seqno_text_pos = (0, 48)
     play_text_pos = (110, 57)
@@ -29,11 +29,8 @@ else:
     # eight all across
     step_text_pos = ( (0,12), (16,12), (32,12), (48,12),
                       (64,12), (80,12), (96,12), (112,12) )
-    #bpm_text_pos = (90, 57)
-    #trans_text_pos = (45, 57)
-    #seqno_text_pos = (0,57)
     bpm_text_pos = (0, 57)
-    bpm_val_pos = (30, 57)
+    bpm_val_pos = (25, 57)
     trans_text_pos = (55, 57)
     seqno_text_pos = (0, 45)
     play_text_pos = (110, 57)

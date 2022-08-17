@@ -75,7 +75,7 @@ class StepSequencer:
 
         # calculate next note timing and held note timing
         err_t = delta_t - self.beat_millis  # how much we are over
-        print("err_t:",self.i, err_t, self.beat_millis)
+        #print("err_t:",self.i, err_t, self.beat_millis)
         self.last_beat_millis = now - err_t - fudge # adjust for our overage
         self.held_note = (note,vel,gate,on) # save for note off later
         self.held_gate_millis = now + ((self.beat_millis * gate) // 16) - err_t # gate ranges from 1-16
