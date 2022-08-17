@@ -56,9 +56,7 @@ class StepSequencerDisplay(displayio.Group):
         self.append(self.octgroup)
         self.append(self.editgroup)
         self.append(self.gategroup)
-        #font = bitmap_font.load_font("ctrld-fixed-13b.pcf")
-        #font = bitmap_font.load_font("unscii-16.pcf")
-        font = bitmap_font.load_font("helvB12.bdf")
+        font = bitmap_font.load_font("helvB12.pcf")
         #font = terminalio.FONT
         font2 = terminalio.FONT
         for (x,y) in step_text_pos:
