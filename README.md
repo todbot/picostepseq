@@ -16,7 +16,7 @@ https://user-images.githubusercontent.com/274093/185005269-afb4c3f7-0ca1-40c8-a1
 ## How to use
 
 PicoStepSeq has two states: playing and paused.  Its firmware is designed so you never have to stop playing to
-edit and save/load a sequence.
+edit and save/load a sequence.  It has 8 sequence slots that can be edited and are persistently saved to flash.
 
 While playing, the actions are:
 
@@ -33,6 +33,10 @@ When paused, the actions are:
 - **Play** -- Tap encoder button
 - **Play notes** -- tap corresponding step key to play its pitch
 - **Change step's pitch** -- Hold step key, turn encoder knob
+
+Sequence Save & Load:
+- On startup, `saved_sequences.json` is read from disk and loaded into the 8 sequence slots
+- Upon transitioning from Play to Pause, all 8 sequences will be written to disk as `saved_sequences.json`
 
 ### Step Keys
 
@@ -63,7 +67,7 @@ There is preliminary support for syncing to MIDI Clock.
 [Build guide to come!]
 
 
-## Installing firmware
+## Installing firmware (CircuitPython)
 
 The firmware lives in the `circuitpython` directory.
 
@@ -78,7 +82,7 @@ The firmware lives in the `circuitpython` directory.
 3. Reset the board and the sequencer should come up!
 
 
-## Firmware Design
+## Firmware Design (CircuitPython)
 
 [More to come!]
 
