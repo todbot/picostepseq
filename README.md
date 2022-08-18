@@ -78,6 +78,14 @@ The firmware lives in the `circuitpython` directory.
 3. Reset the board and the sequencer should come up!
 
 
+## Firmware Design
+
+[More to come!]
+
+Thanks to [Winterbloom](https://github.com/wntrblm) and [@theacodes](https://github.com/theacodes) for the awesome
+[SmolMIDI library](https://github.com/wntrblm/Winterbloom_SmolMIDI) for efficient MIDI parsing.
+(and for [really cool Eurorack synthesizer devices](https://winterbloom.com/shop))
+
 **Note:** If you have an [Adafruit MacroPad RP2040](https://www.adafruit.com/product/5128),
 you can experiment with the sequencer without building any hardware! The code will auto-detect
 if it's running on a MacroPad. Rotate the MacroPad so the display is on the left,
