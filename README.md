@@ -2,6 +2,10 @@
 
 PicoStepSeq is an 8-step MIDI sequencer using a Raspberry Pi Pico, an I2C SSD1306 OLED display, a rotary encoder. and 8 "Step Switches".  It outputs via USB MIDI and Serial MIDI via TRS-A 3.5mm.
 
+It is designed for people with beginner-level soldering skills.
+Part count is minimal, with all parts are through-hole, except for the two MIDI jacks,
+which are easily solderable by hand.
+
 <a href="./docs/picostepseq_photo1.jpg"><img width=400 src="./docs/picostepseq_photo1.jpg"/></a>
 <a href="./docs/picostepseq_render2.jpg"><img width=400 src="./docs/picostepseq_render2.jpg"/></a>
 
@@ -54,6 +58,11 @@ PicoStepSeq outputs both USB MIDI and Serial MIDI.
 There is preliminary support for syncing to MIDI Clock.
 
 
+## Building
+
+[Build guide to come!]
+
+
 ## Installing firmware
 
 The firmware lives in the `circuitpython` directory.
@@ -75,10 +84,9 @@ if it's running on a MacroPad. Rotate the MacroPad so the display is on the left
 then the sequencer keys are arranged as two rows of four.
 
 
-
 ## Bill of Materials
 
-Here is a [Digikey cart with most parts](https://www.digikey.com/short/3hfhv8p4).
+Here is a [Digikey cart with most parts](https://www.digikey.com/short/8qh7p87z).
 
 Links also included below for major parts
 
