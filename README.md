@@ -1,6 +1,6 @@
 # PicoStepSeq
 
-PicoStepSeq is an 8-step MIDI sequencer using a Raspberry Pi Pico, an I2C SSD1306 OLED display, a rotary encoder. and 8 "Step Switches".
+PicoStepSeq is an 8-step MIDI sequencer using a Raspberry Pi Pico, an I2C SSD1306 OLED display, a rotary encoder. and 8 "Step Switches".  It outputs via USB MIDI and Serial MIDI via TRS-A 3.5mm.
 
 <a href="./docs/picostepseq_photo1.jpg"><img width=400 src="./docs/picostepseq_photo1.jpg"/></a>
 <a href="./docs/picostepseq_render2.jpg"><img width=400 src="./docs/picostepseq_render2.jpg"/></a>
@@ -30,6 +30,14 @@ When paused, the actions are:
 - **Play notes** -- tap corresponding step key to play its pitch
 - **Change step's pitch** -- Hold step key, turn encoder knob
 
+### Step Keys
+
+The 8 "step keys" have an LED that indicate current mute/unmute status and which step is currently being played.
+Tap on a step key to mute/unmute it. Hold a key and turn the encoder knob to change the pitch of that step.
+
+### Rotary Encoder
+
+Turning the encoder adjusts the transpose amount of the playing sequence.  Push + turning adjusts the tempo.
 
 ### Display
 
@@ -44,6 +52,17 @@ The display is hopefully clear. It's divided into the top section showing 8 note
 PicoStepSeq outputs both USB MIDI and Serial MIDI.
 
 There is preliminary support for syncing to MIDI Clock.
+
+
+## Installing firmware
+
+The firmware lives in the `circuitpython` directory.
+Copy all files in the `circuitpython` directory to the CIRCUITPY disk.
+
+Then install the libraries `adafruit_displayio_ssd1306` and `adafruit_display_text`.
+`circup install adafruit_displayio_ssd1306 adafruit_display_text`
+
+Reset the board and the sequencer should come up!
 
 
 ## Bill of Materials
@@ -79,8 +98,9 @@ You can attach the Pico & the OLED display how you like, but if using the 3d-pri
 - 2 - 20-pin header pins ([Digikey](https://www.digikey.com/en/products/detail/adam-tech/PH1-20-UA/9830398), [Adafruit ](https://www.adafruit.com/product/392))
 - 1 - 4-pin female (same as above, break off 4-pin chunk)
 
+
 ## PCB layout
 
-<img width=700 src="./docs/picostepseq_pcbbot.png"/>
-
 <img width=700 src="./docs/picostepseq_pcbtop.png"/>
+
+<img width=700 src="./docs/picostepseq_pcbbot.png"/>
