@@ -57,12 +57,23 @@ There is preliminary support for syncing to MIDI Clock.
 ## Installing firmware
 
 The firmware lives in the `circuitpython` directory.
-Copy all files in the `circuitpython` directory to the CIRCUITPY disk.
 
-Then install the libraries `adafruit_displayio_ssd1306` and `adafruit_display_text`.
-`circup install adafruit_displayio_ssd1306 adafruit_display_text`
+1. Copy all files in the `circuitpython` directory to the CIRCUITPY disk.
 
-Reset the board and the sequencer should come up!
+2. Install the libraries `adafruit_displayio_ssd1306` and `adafruit_display_text`.
+
+  The command-line tool `circup` is very useful to install libraries:
+
+  `circup install adafruit_displayio_ssd1306 adafruit_display_text`
+
+3. Reset the board and the sequencer should come up!
+
+
+**Note:** If you have an [Adafruit MacroPad RP2040](https://www.adafruit.com/product/5128),
+you can experiment with the sequencer without building any hardware! The code will auto-detect
+if it's running on a MacroPad. Rotate the MacroPad so the display is on the left,
+then the sequencer keys are arranged as two rows of four.
+
 
 
 ## Bill of Materials
