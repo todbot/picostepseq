@@ -39,7 +39,7 @@ else:
     gate_bar_width, gate_bar_height = (14,4)
     edit_text_offset = (3,22)
 
-class StepSequencerDisplay(displayio.Group):
+class SequencerDisplay(displayio.Group):
     def __init__(self, sequencer):
         super().__init__(x=0,y=0,scale=1)
         self.seq = sequencer
