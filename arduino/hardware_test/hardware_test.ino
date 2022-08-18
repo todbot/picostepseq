@@ -13,10 +13,10 @@
 #include <Fonts/FreeMono12pt7b.h>
 #include <Fonts/FreeMono18pt7b.h>
 #include <Fonts/FreeMonoBold12pt7b.h>
+#include "Font5x7FixedMono.h"
+
 #define myfont FreeMono9pt7b
-//#define myfont FreeMono12pt7b  // sigh
-//#define myfont FreeMono18pt7b  // sigh
-//#define myfont FreeMonoBold12pt7b
+#define myfont2 Font5x7FixedMono 
 // see: https://learn.adafruit.com/adafruit-gfx-graphics-library/using-fonts
 
 const int num_steps = 8;
@@ -106,17 +106,20 @@ void loop()
   display.setTextSize(1);
   display.setTextColor(SSD1306_WHITE, 0);
   display.println(F("hello world"));
+
+  //display.setFont(0); // go back to built-in font
+  display.setFont(&myfont2);
   display.setTextSize(1);
   display.setCursor(0,45);
   display.print("enc:");
-  display.setCursor(64, 45);
+  display.setCursor(50, 45);
   display.print(encoder_pos);
   display.setCursor(110, 45);
   display.print(encoder_pressed ? "*" : ".");
 
   display.setCursor(0, 60);
-  display.print("keys:");
-  display.setCursor(64, 60);
+  display.print("key:");
+  display.setCursor(50, 60);
   display.print(keyspressed);
   display.display();
   
