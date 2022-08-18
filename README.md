@@ -2,14 +2,14 @@
 
 PicoStepSeq is an 8-step MIDI sequencer using a Raspberry Pi Pico, an I2C SSD1306 OLED display, a rotary encoder. and 8 "Step Switches".
 
-<a href="./docs/picostepseq_photo1.jpg"><img width=350 src="./docs/picostepseq_photo1.jpg"/></a>
-<a href="./docs/picostepseq_render2.jpg"><img width=350 src="./docs/picostepseq_render2.jpg"/></a>
+<a href="./docs/picostepseq_photo1.jpg"><img width=400 src="./docs/picostepseq_photo1.jpg"/></a>
+<a href="./docs/picostepseq_render2.jpg"><img width=400 src="./docs/picostepseq_render2.jpg"/></a>
 
-Demo video of it action:
+## Demo video
 
 https://user-images.githubusercontent.com/274093/185005269-afb4c3f7-0ca1-40c8-a17d-6e4756943d87.mov
 
-### How to use
+## How to use
 
 PicoStepSeq has two states: playing and paused.  Its firmware is designed so you never have to stop playing to
 edit and save/load a sequence.
@@ -29,6 +29,15 @@ When paused, the actions are:
 - **Play** -- Tap encoder button
 - **Play notes** -- tap corresponding step key to play its pitch
 - **Change step's pitch** -- Hold step key, turn encoder knob
+
+
+### Display
+
+PicoStepSeq can be used without really looking at the display (which is good because the display is very small).
+The display is hopefully clear. It's divided into the top section showing 8 notes with gate info and the bottom section showing which sequence, current BPM & transpose, and if the sequencer is in play/pause mode.
+
+<a href="./docs/picostepseq_display1.jpg"><img width=700 src="./docs/picostepseq_display1.jpg"/></a>
+
 
 ### MIDI
 
@@ -70,7 +79,7 @@ You can attach the Pico & the OLED display how you like, but if using the 3d-pri
 - 2 - 20-pin header pins ([Digikey](https://www.digikey.com/en/products/detail/adam-tech/PH1-20-UA/9830398), [Adafruit ](https://www.adafruit.com/product/392))
 - 1 - 4-pin female (same as above, break off 4-pin chunk)
 
-## PCB layout:
+## PCB layout
 
 <img width=700 src="./docs/picostepseq_pcbbot.png"/>
 
