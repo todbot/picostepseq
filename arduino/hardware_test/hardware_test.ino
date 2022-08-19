@@ -38,6 +38,7 @@ const int oled_scl_pin = 21;
 const int oled_i2c_addr = 0x3C;
 
 Bounce keys[num_steps];
+Bounce encoder_switch;
 
 RotaryEncoder encoder(encoderB_pin, encoderA_pin, RotaryEncoder::LatchMode::FOUR3);
 void checkEncoderPosition() {  encoder.tick(); } // just call tick() to check the state.
@@ -58,11 +59,12 @@ void setup() {
   }
 
   // ENCODER
-  pinMode(encoderSW_pin, INPUT_PULLUP);
+  //pinMode(encoderSW_pin, INPUT_PULLUP);
   pinMode(encoderA_pin, INPUT_PULLUP);
   pinMode(encoderB_pin, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(encoderA_pin), checkEncoderPosition, CHANGE);
   attachInterrupt(digitalPinToInterrupt(encoderB_pin), checkEncoderPosition, CHANGE);
+  encoder_switch.attach(encoderSW_pin, INPUT_PULLUP);
 
   // DISPLAY
   Wire.setSDA( oled_sda_pin );
@@ -83,13 +85,15 @@ char keyspressed[num_steps+1];
 
 void loop() 
 {
+  // KEYS
   for (uint8_t i=0; i< num_steps; i++) {
     keys[i].update();
     bool keypressed = keys[i].read() == LOW; // active low
     keyspressed[i] = keypressed ? '1' : '0';
     digitalWrite( led_pins[i], keypressed); // light up the key LEDs for yucks
   }
-    
+  // ENCODER
+  encoder_switch.update();
   encoder.tick();
   int newPos = encoder.getPosition();
   if (encoder_pos != newPos) {
@@ -99,7 +103,7 @@ void loop()
     Serial.println((int)(encoder.getDirection()));
     encoder_pos = newPos;
   }
-  bool encoder_pressed = digitalRead( encoderSW_pin) == LOW;
+  bool encoder_pressed = encoder_switch.read() == LOW;
  
   display.clearDisplay();
   display.setFont(&myfont);
