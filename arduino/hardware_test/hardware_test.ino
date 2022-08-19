@@ -7,6 +7,7 @@
  
 #include <Wire.h>
 #include <RotaryEncoder.h>
+#include <Bounce2.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <Fonts/FreeMono9pt7b.h>
@@ -14,6 +15,7 @@
 #include <Fonts/FreeMono18pt7b.h>
 #include <Fonts/FreeMonoBold12pt7b.h>
 #include "Font5x7FixedMono.h"
+
 
 #define myfont FreeMono9pt7b
 #define myfont2 Font5x7FixedMono 
@@ -35,6 +37,8 @@ const int oled_scl_pin = 21;
 
 const int oled_i2c_addr = 0x3C;
 
+Bounce keys[num_steps];
+
 RotaryEncoder encoder(encoderB_pin, encoderA_pin, RotaryEncoder::LatchMode::FOUR3);
 void checkEncoderPosition() {  encoder.tick(); } // just call tick() to check the state.
 int encoder_pos = 0; // our encoder position state
@@ -43,11 +47,9 @@ Adafruit_SSD1306 display(dw, dh, &Wire, -1);
 
 
 void setup() {
-  Serial.begin(11520);
-
   // KEYS
   for (uint8_t i=0; i< num_steps; i++) {
-    pinMode(key_pins[i], INPUT_PULLUP);
+    keys[i].attach( key_pins[i], INPUT_PULLUP);
   }
 
   // LEDS
@@ -81,11 +83,11 @@ char keyspressed[num_steps+1];
 
 void loop() 
 {
-  // read keys
-  for( int i=0; i< num_steps; i++) {
-    bool keypressed = (digitalRead(key_pins[i]) == LOW);
+  for (uint8_t i=0; i< num_steps; i++) {
+    keys[i].update();
+    bool keypressed = keys[i].read() == LOW; // active low
     keyspressed[i] = keypressed ? '1' : '0';
-    digitalWrite( led_pins[i], keypressed);
+    digitalWrite( led_pins[i], keypressed); // light up the key LEDs for yucks
   }
     
   encoder.tick();
