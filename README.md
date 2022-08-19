@@ -67,12 +67,15 @@ There is preliminary support for syncing to MIDI Clock.
 
 [Build guide to come!]
 
+### Enclosure
 
-## Installing firmware (CircuitPython)
+A 3d-printable enclosure is [available on Printables](https://www.printables.com/model/260860-picostepseq-midi-step-sequencer-w-raspberry-pi-pic)
 
-The firmware lives in the `circuitpython` directory.
+## Installing Firmware (CircuitPython)
 
-1. Copy all files in the `circuitpython` directory to the CIRCUITPY disk.
+The firmware lives in the `circuitpython/picostepseq` directory.
+
+1. Copy all files in the `circuitpython/picostepseq` directory to the CIRCUITPY disk.
 
 2. Install the libraries `adafruit_displayio_ssd1306` and `adafruit_display_text`.
 
