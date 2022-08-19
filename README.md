@@ -15,10 +15,11 @@ https://user-images.githubusercontent.com/274093/185005269-afb4c3f7-0ca1-40c8-a1
 
 ## How to use
 
-PicoStepSeq has two states: playing and paused.  Its firmware is designed so you never have to stop playing to
-edit and save/load a sequence.  It has 8 sequence slots that can be edited and are persistently saved to flash.
+In use, PicoStepSeq has two states: Play and Pause.
+It is designed so you never have to stop playing to edit and save/load a sequence.
+It has 8 sequence slots that can be edited and are persistently saved to flash.
 
-While playing, the actions are:
+While Playing, the actions are:
 
 - **Pause** -- Tap encoder button
 - **Transpose sequence up/down** -- Turn encoder knob
@@ -29,7 +30,7 @@ While playing, the actions are:
 - **Load sequence** -- Push encoder, tap step key 1-8, release encoder
 - **Save sequence** -- Push encoder, hold step key 1-8 for 2 secs, release encoder
 
-When paused, the actions are:
+When Paused, the actions are:
 - **Play** -- Tap encoder button
 - **Play notes** -- tap corresponding step key to play its pitch
 - **Change step's pitch** -- Hold step key, turn encoder knob

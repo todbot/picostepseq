@@ -1,5 +1,8 @@
-# picosteseq_test1_code.py -- basic proof-of-concept of all IO
+# hardware_test_code.py -- basic proof-of-concept of all IO on picostepseq, copy as 'code.py'
 # 5 Aug 2022 - @todbot / Tod Kurt
+# Part of https://github.com/todbot/picostepseq/
+#
+
 # built-in libraries
 import time
 import board
@@ -8,6 +11,7 @@ import busio
 import keypad
 import rotaryio
 import displayio, terminalio
+
 # libraries needed to be installed by circup
 import adafruit_debouncer
 import adafruit_displayio_ssd1306
