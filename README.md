@@ -55,7 +55,6 @@ The display is hopefully clear. It's divided into the top section showing 8 note
 
 <a href="./docs/picostepseq_display1.jpg"><img width=700 src="./docs/picostepseq_display1.jpg"/></a>
 
-
 ### MIDI
 
 PicoStepSeq outputs both USB MIDI and Serial MIDI.
@@ -63,9 +62,15 @@ PicoStepSeq outputs both USB MIDI and Serial MIDI.
 There is preliminary support for syncing to MIDI Clock.
 
 
+
 ## Building
 
+The schematic and PCB design is in the `hardware` directory.
+
+An [OSHPark project](https://oshpark.com/shared_projects/vPWjBrmO) of the PCBs is ready to go.
+
 [Build guide to come!]
+
 
 ### Enclosure
 
@@ -75,7 +80,7 @@ The current enclosure is designed for the case where sockets are used for both t
 This is so either can be removed for other uses, so you don't have to sacrifice a Pico if you want to try this out.
 
 
-## Installing Firmware (CircuitPython)
+### Installing Firmware (CircuitPython)
 
 The firmware lives in the `circuitpython/picostepseq` directory.
 
@@ -88,20 +93,6 @@ The firmware lives in the `circuitpython/picostepseq` directory.
   `circup install adafruit_displayio_ssd1306 adafruit_display_text`
 
 3. Reset the board and the sequencer should come up!
-
-
-## Firmware Design (CircuitPython)
-
-[More to come!]
-
-Thanks to [Winterbloom](https://github.com/wntrblm) and [@theacodes](https://github.com/theacodes) for the awesome
-[SmolMIDI library](https://github.com/wntrblm/Winterbloom_SmolMIDI) for efficient MIDI parsing.
-(and for [really cool Eurorack synthesizer devices](https://winterbloom.com/shop))
-
-**Note:** If you have an [Adafruit MacroPad RP2040](https://www.adafruit.com/product/5128),
-you can experiment with the sequencer without building any hardware! The code will auto-detect
-if it's running on a MacroPad. Rotate the MacroPad so the display is on the left,
-then the sequencer keys are arranged as two rows of four.
 
 
 ## Bill of Materials
@@ -138,7 +129,22 @@ You can attach the Pico & the OLED display how you like, but if using the 3d-pri
 - 1 - 4-pin female (same as above, break off 4-pin chunk)
 
 
+## Firmware Design (CircuitPython)
+
+[More to come!]
+
+Thanks to [Winterbloom](https://github.com/wntrblm) and [@theacodes](https://github.com/theacodes) for the awesome
+[SmolMIDI library](https://github.com/wntrblm/Winterbloom_SmolMIDI) for efficient MIDI parsing.
+(and for [really cool Eurorack synthesizer devices](https://winterbloom.com/shop))
+
+**Note:** If you have an [Adafruit MacroPad RP2040](https://www.adafruit.com/product/5128),
+you can experiment with the sequencer without building any hardware! The code will auto-detect
+if it's running on a MacroPad. Rotate the MacroPad so the display is on the left,
+then the sequencer keys are arranged as two rows of four.
+
 ## PCB layout
+
+This is the original version that has a typo on the MIDI jacks.
 
 <img width=700 src="./docs/picostepseq_pcbtop.png"/>
 
