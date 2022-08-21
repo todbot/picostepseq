@@ -9,8 +9,10 @@
  * - Adafruit_SSD1306 -- https://github.com/adafruit/Adafruit_SSD1306
  * - Adafruit_TinyUSB -- https://github.com/adafruit/Adafruit_TinyUSB_Arduino
  * - MIDI -- https://github.com/FortySevenEffects/arduino_midi_library
+ * - ArduinoJson -- https://arduinojson.org/
  *
  * IDE change:
+ * - Select "Tools / Flash Size: 2MB (Sketch: 1MB / FS: 1MB)
  * - Select "Tools / USB Stack: Adafruit TinyUSB"
  *
  **/
@@ -21,16 +23,21 @@
 #include <Adafruit_SSD1306.h>
 #include <Adafruit_TinyUSB.h>
 #include <MIDI.h>
+#include <LittleFS.h>
+#include <ArduinoJson.h>
 
 #include "fonts/helvnCB6pt7b.h"
-#include "fonts/ter_u12n7b.h" // CirPy's default displayio font
-#include "Sequencer.hpp"
+#include "fonts/ter_u12n7b.h" // CirPy's default displayio font, it seems
 
-#define myfont helvnCB6pt7b
+#define myfont helvnCB6pt7b   // sigh
 #define myfont2 ter_u12n7b
-// see: https://learn.adafruit.com/adafruit-gfx-graphics-library/using-fonts
 
 const int numsteps = 8;
+const int numseqs = 8;
+
+#include "Sequencer.hpp"
+
+// begin hardware definitions
 const int dw = 128;
 const int dh = 64;
 
@@ -48,7 +55,7 @@ const int oled_i2c_addr = 0x3C;
 
 const int midi_tx_pin = 16;
 const int midi_rx_pin = 17;
-
+// end hardware definitions
 
 int led_vals[numsteps];
 int led_fade = 20;
@@ -63,13 +70,17 @@ int encoder_pos_last = 0;
 Adafruit_SSD1306 display(dw, dh, &Wire, -1);
 
 Adafruit_USBD_MIDI usb_midi;  // USB MIDI object
-
 MIDI_CREATE_INSTANCE(Adafruit_USBD_MIDI, usb_midi, MIDIusb); // USB MIDI
 MIDI_CREATE_INSTANCE(HardwareSerial, Serial1, MIDIserial);   // Serial MIDI
 
 float tempo = 100;
 StepSequencer seqr;
 
+Step sequences[numseqs][numsteps];
+
+const char* save_file = "/saved_sequences.json";
+
+// callback used by Sequencer to trigger note on
 void play_note_on( uint8_t note, uint8_t vel, uint8_t gate, bool on ) {
     Serial.printf("play_note_on: %d %d %d %d\n", note,vel,gate,on);
     if( on ) {
@@ -78,23 +89,26 @@ void play_note_on( uint8_t note, uint8_t vel, uint8_t gate, bool on ) {
     }
 }
 
+// callback used by Sequencer to trigger note off
 void play_note_off(uint8_t note, uint8_t vel, uint8_t gate, bool on ) {
     Serial.printf("play_note_off: %d %d %d %d\n", note,vel,gate,on);
+    // always send note off for now
     MIDIusb.sendNoteOff(note, vel, 1);
     MIDIserial.sendNoteOff(note, vel, 1);
 }
 
-void setup1() {
-}
+// core1 is only for MIDI output
+void setup1() { }
 
+// core1 is only for MIDI output
 void loop1() {
-    //
     seqr.update();
-
-    //delay(10);
 }
 
+//  core0 is UI (buttons, knobs, display)
 void setup() {
+    LittleFS.begin();
+
     // USB and MIDI
     USBDevice.setManufacturerDescriptor("todbot");
     USBDevice.setProductDescriptor     ("PicoStepSeq");
@@ -107,6 +121,9 @@ void setup() {
 
     MIDIusb.turnThruOff();    // turn off echo
     MIDIserial.turnThruOff(); // turn off echo
+
+    sequences_read();
+    sequence_load( seqr.seqno ); // 0
 
     seqr.set_tempo(tempo);
     seqr.on_func = play_note_on;
@@ -132,14 +149,6 @@ void setup() {
     encoder_switch.attach(encoderSW_pin, INPUT_PULLUP);
     encoder_switch.setPressedState(LOW);
 
-    // random setup data
-    for( int i=0; i< numsteps; i++) {
-        seqr.steps[i].note = random(48,60);
-        seqr.steps[i].vel = 100;
-        seqr.steps[i].gate = random(1,16);
-        seqr.steps[i].on = true;
-    }
-
     displaySetup();
 
 }
@@ -158,12 +167,14 @@ void displaySetup() {
     display.display();  // must clear before display, otherwise shows adafruit logo
 }
 
+// variables for UI state management
 int encoder_delta = 0;
 uint32_t encoder_push_millis;
 uint32_t step_push_millis;
 int step_push = -1;
 bool step_edited = false;
 
+// main UI loop
 void loop()
 {
     // LEDS update
@@ -227,6 +238,9 @@ void loop()
             // UI: encoder tap with no key == play/pause
             if( now - encoder_push_millis < 300 ) {
                 seqr.toggle_play_pause();
+                if( ! seqr.playing ) {
+                    sequences_write();  // write to disk on pause
+                }
             }
         }
         encoder_push_millis = 0;  // we own it, and we're done with it
@@ -259,12 +273,11 @@ void loop()
             if( encoder_push_millis > 0 ) {  // UI: load/save sequence mode
                 // UI: encoder push + hold step key = save sequence
                 if( now - step_push_millis > 1000 ) {
-                    Serial.printf("save sequence: %d\n", i);
+                    sequence_save( step_push );
                 }
                 // UI: encoder push + tap step key = load sequence
                 else {
-                    seqr.seqno = i;
-                    Serial.printf("load sequence: %d\n", i);
+                    sequence_load( step_push );
                 }
             }
             else {  // UI: encoder not pushed, mutes or play notes
@@ -292,6 +305,94 @@ void loop()
     displayUpdate();
 
 }
+
+// --- sequence load / save functions
+
+// write all sequences to "disk"
+void sequences_write() {
+    Serial.println("sequences_write");
+    DynamicJsonDocument doc(8192); // assistant said 6144
+    for( int j=0; j < numseqs; j++ ) {
+        JsonArray seq_array = doc.createNestedArray();
+        for( int i=0; i< numsteps; i++ ) {
+            Step s = sequences[j][i];
+            JsonArray step_array = seq_array.createNestedArray();
+            step_array.add( s.note );
+            step_array.add( s.vel );
+            step_array.add( s.gate );
+            step_array.add( s.on );
+        }
+    }
+
+    LittleFS.remove( save_file );
+    File file = LittleFS.open( save_file, "w");
+    if( !file ) {
+        Serial.println("sequences_write: Failed to create file");
+        return;
+    }
+    if(serializeJson(doc, file) == 0) {
+        Serial.println(F("sequences_write: Failed to write to file"));
+    }
+    file.close();
+    serializeJson(doc, Serial);
+}
+
+// read all sequences from "disk"
+void sequences_read() {
+    Serial.println("sequences_read");
+
+    // File f = LittleFS.open( save_file, "r");
+    // String s = f.readStringUntil('\n');
+    // f.close();
+    // Serial.println("  contents:"); Serial.println(s);
+
+    File file = LittleFS.open( save_file, "r");
+    if( !file ) {
+        Serial.println("sequences_read: no sequences file");
+        return;
+    }
+
+    DynamicJsonDocument doc(8192); // assistant said 6144
+    DeserializationError error = deserializeJson(doc, file); // inputLength);
+    if(error) {
+        Serial.print("sequences_read: deserialize failed: ");
+        Serial.println(error.c_str());
+        return;
+    }
+
+    for( int j=0; j < numseqs; j++ ) {
+        JsonArray seq_array = doc[j];
+        for( int i=0; i< numsteps; i++ ) {
+            JsonArray step_array = seq_array[i];
+            Step s;
+            s.note = step_array[0];
+            s.vel  = step_array[1];
+            s.gate = step_array[2];
+            s.on   = step_array[3];
+            sequences[j][i] = s;
+        }
+    }
+    file.close();
+}
+
+// Load a single sequence from into the sequencer from RAM storage
+void sequence_load(int seq_num) {
+    Serial.printf("sequence_load:%d\n", seq_num);
+    for( int i=0; i< numsteps; i++) {
+        seqr.steps[i] = sequences[seq_num][i];
+    }
+    seqr.seqno = seq_num;
+}
+
+// Store current sequence in sequencer to RAM storage"""
+void sequence_save(int seq_num) {
+    Serial.printf("sequence_save:%d\n", seq_num);
+    for( int i=0; i< numsteps; i++) {
+        sequences[seq_num][i] = seqr.steps[i];;
+    }
+}
+
+// --- display details
 
 ////
 const int step_text_pos[] = { 0,12, 16,12, 32,12, 48,12,  64,12, 80,12, 96,12, 112,12 };
