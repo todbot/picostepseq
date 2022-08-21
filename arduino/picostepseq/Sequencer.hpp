@@ -54,7 +54,7 @@ public:
         uint8_t n = s.note + transpose;
         //if held_gate_millis:
         on_func(n, s.vel, s.gate, s.on);
-        //uint16_t err_t = delta_t - beat_millis;
+        //uint16_t err_t = delta_t - beat_millis; // may not need this if we run sequencer on rp2040 core1
         last_beat_millis = now; // - err_t - fudge;
         held_note = s;
         held_gate_millis = now + ((s.gate * beat_millis) / 16);
@@ -67,7 +67,9 @@ public:
         uint16_t delta_t = now - last_beat_millis;
         if( held_gate_millis != 0 && now >= held_gate_millis ) {
             held_gate_millis = 0;
-            //off_func();
+            Step s = steps[stepi];
+            uint8_t n = s.note + transpose;
+            off_func(n, s.vel, s.gate, s.on);
         }
 
         if( delta_t >= beat_millis ) {

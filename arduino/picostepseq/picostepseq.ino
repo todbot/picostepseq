@@ -46,6 +46,13 @@ const int oled_scl_pin = 21;
 
 const int oled_i2c_addr = 0x3C;
 
+const int midi_tx_pin = 16;
+const int midi_rx_pin = 17;
+
+
+int led_vals[numsteps];
+int led_fade = 20;
+
 Bounce2::Button keys[numsteps];
 Bounce2::Button encoder_switch;
 
@@ -65,10 +72,16 @@ StepSequencer seqr;
 
 void play_note_on( uint8_t note, uint8_t vel, uint8_t gate, bool on ) {
     Serial.printf("play_note_on: %d %d %d %d\n", note,vel,gate,on);
+    if( on ) {
+        MIDIusb.sendNoteOn(note, vel, 1); // 1?
+        MIDIserial.sendNoteOn(note, vel, 1); // 1?
+    }
 }
 
 void play_note_off(uint8_t note, uint8_t vel, uint8_t gate, bool on ) {
     Serial.printf("play_note_off: %d %d %d %d\n", note,vel,gate,on);
+    MIDIusb.sendNoteOff(note, vel, 1);
+    MIDIserial.sendNoteOff(note, vel, 1);
 }
 
 void setup1() {
@@ -86,12 +99,14 @@ void setup() {
     USBDevice.setManufacturerDescriptor("todbot");
     USBDevice.setProductDescriptor     ("PicoStepSeq");
 
+    Serial1.setRX(midi_rx_pin);
+    Serial1.setTX(midi_tx_pin);
+
     MIDIusb.begin(MIDI_CHANNEL_OMNI);
     MIDIserial.begin(MIDI_CHANNEL_OMNI);
 
     MIDIusb.turnThruOff();    // turn off echo
     MIDIserial.turnThruOff(); // turn off echo
-
 
     seqr.set_tempo(tempo);
     seqr.on_func = play_note_on;
@@ -110,7 +125,6 @@ void setup() {
     }
 
     // ENCODER
-    //pinMode(encoderSW_pin, INPUT_PULLUP);
     pinMode(encoderA_pin, INPUT_PULLUP);
     pinMode(encoderB_pin, INPUT_PULLUP);
     attachInterrupt(digitalPinToInterrupt(encoderA_pin), checkEncoderPosition, CHANGE);
@@ -120,14 +134,14 @@ void setup() {
 
     // random setup data
     for( int i=0; i< numsteps; i++) {
-        seqr.steps[i].note = random(36,60);
+        seqr.steps[i].note = random(48,60);
         seqr.steps[i].vel = 100;
         seqr.steps[i].gate = random(1,16);
         seqr.steps[i].on = true;
     }
 
     displaySetup();
-    delay(1000);
+
 }
 
 void displaySetup() {
@@ -144,13 +158,11 @@ void displaySetup() {
     display.display();  // must clear before display, otherwise shows adafruit logo
 }
 
-char keyspressed[numsteps+1];
 int encoder_delta = 0;
 uint32_t encoder_push_millis;
 uint32_t step_push_millis;
 int step_push = -1;
-int led_vals[numsteps]; // need this because we cannot read back analogWrite() values
-int led_fade = 20;
+bool step_edited = false;
 
 void loop()
 {
@@ -183,12 +195,14 @@ void loop()
             int gate = seqr.steps[step_push].gate;
             gate = constrain( gate + encoder_delta, 1,15);
             seqr.steps[step_push].gate = gate;
+            step_edited = true;
         }
         // UI: encoder turn while step key held = change step's note
         else if( step_push > -1 ) {
             int note = seqr.steps[step_push].note;
             note = constrain( note + encoder_delta, 1,127);
             seqr.steps[step_push].note = note;
+            step_edited = true;
         }
         // UI: encoder turn while encoder pushed = change tempo
         else if( encoder_push_millis > 0 ) {
@@ -256,7 +270,12 @@ void loop()
             else {  // UI: encoder not pushed, mutes or play notes
                 // UI: playing: step keys = mutes/unmutes
                 if( seqr.playing ) {
-                    seqr.steps[i].on = !seqr.steps[i].on;
+                    if( step_edited ) {
+                    }
+                    else {
+                        // UI: if playing, step keys == mute/unmute toggle
+                        seqr.steps[i].on = !seqr.steps[i].on;
+                    }
                 }
                 // UI: paused: step keys = play step notes
                 else {
@@ -265,6 +284,7 @@ void loop()
             }
             step_push_millis = 0;
             step_push = -1; //
+            step_edited = false;
         }
     }
 
@@ -282,7 +302,8 @@ const int seqno_text_pos[] = {0, 45};
 const int play_text_pos[] = {110, 57};
 const int oct_text_offset[] = {3,12};
 const int gate_bar_offset[] = {0,-12};
-const int gate_bar_dim[] = {14,4};
+const int gate_bar_width = 14;
+const int gate_bar_height = 4;
 const int edit_text_offset[] = {3,22};
 
 const char* note_strs[] = { "A ", "A#", "B ", "C ", "C#", "D ", "D# ", "E ", "F ", "F#", "G ", "G#"};
@@ -299,7 +320,7 @@ void displayUpdate()
 {
     display.clearDisplay();
     display.setFont(&myfont);
-    display.setTextColor(SSD1306_WHITE, 0);
+    display.setTextColor(WHITE, 0);
     for( int i=0; i< numsteps; i++ ) {
         Step s = seqr.steps[i];
         const char* nstr = notenum_to_notestr( s.note );
@@ -309,6 +330,8 @@ void displayUpdate()
         display.print( nstr );
         display.setCursor( x + oct_text_offset[0], y + oct_text_offset[1] );
         display.printf( "%1d", o );
+        int gate_w = 1 + (s.gate * gate_bar_width / 16);
+        display.fillRect( x + gate_bar_offset[0], y + gate_bar_offset[1], gate_w, gate_bar_height, WHITE);
     }
 
     display.setFont(&myfont2);
