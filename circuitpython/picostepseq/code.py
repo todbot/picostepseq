@@ -228,7 +228,6 @@ while True:
             seqr.steps[ step_push ] = (n,v,gate,on)
             step_edited = True
             seqr_display.update_ui_step( step_push, n, v, gate, on, True)
-            encoder_delta = 0  # we used up encoder delta
 
         # UI:  encoder turned while step key held == change step's note
         elif step_push > -1:  # step key pressed
@@ -244,20 +243,18 @@ while True:
             seqr.steps[ step_push ] = (n,v,gate,on)
             step_edited = True
             seqr_display.update_ui_step( step_push, n, v, gate, on, True)
-            encoder_delta = 0  # we used up encoder delta
 
         # UI: encoder turned while encoder pushed == change tempo
         elif encoder_push_millis > 0:
             tempo = tempo + encoder_delta
             seqr.set_tempo(tempo)
             seqr_display.update_ui_bpm()
-            encoder_delta = 0  # we've used up the encoder delta
 
         # UI: encoder turned without any modifiers == change transpose
         else:
             seqr.transpose = min(max(seqr.transpose + encoder_delta, -36), 36)
             seqr_display.update_ui_transpose()
-            encoder_delta = 0  # we used up encoder delta
+        encoder_delta = 0  # we used up encoder delta
 
     # on encoder push
     encsw = hw.encoder_switch.events.get()
@@ -298,7 +295,7 @@ while True:
                 print("+ press", key.key_number, "step_push:",step_push)
                 step_push_millis = ticks_ms()
 
-                # encoder push + key push = load/save sequence
+                # encoder push + key push = load/save sequence ## FIXME need to clean this up
                 if encoder_push_millis > 0:
                     pass
                 else:
