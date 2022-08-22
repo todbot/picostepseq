@@ -133,6 +133,12 @@ You can attach the Pico & the OLED display how you like, but if using the 3d-pri
 
 [More to come!]
 
+Timing in CircuitPython is all over the place and there's no periodic timer support (like `Timer` in MicroPython).
+So, in order to minimize timing jitter due to I2C `displayio` transactions, the UI & display update code
+is designed so only the minimal amount of information is changed on the display in one iteration of the main
+UI loop. This is most noticable when loading a new sequence: the entire sequence is revealed only after a full
+loop.
+
 Thanks to [Winterbloom](https://github.com/wntrblm) and [@theacodes](https://github.com/theacodes) for the awesome
 [SmolMIDI library](https://github.com/wntrblm/Winterbloom_SmolMIDI) for efficient MIDI parsing.
 (and for [really cool Eurorack synthesizer devices](https://winterbloom.com/shop))
