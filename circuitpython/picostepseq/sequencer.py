@@ -121,12 +121,12 @@ class StepSequencer:
 
     def notenum_to_noteoct(self, notenum):
         """Return note and octave as (string,int) tuple"""
-        octave = notenum // 12 - 1;
+        octave = notenum // 12 - 2;
         notename = note_names[notenum % 12]
         return (notename, octave)
 
     # old do not use
     def notenum_to_name(self, notenum, separator=""):
-        octave = notenum // 12 - 1;
+        octave = notenum // 12 - 2;
         n = notenum % 12
         return note_names[n] +separator+ str(octave)

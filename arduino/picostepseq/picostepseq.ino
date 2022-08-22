@@ -419,10 +419,10 @@ const int gate_bar_width = 14;
 const int gate_bar_height = 4;
 const int edit_text_offset[] = {3,22};
 
-const char* note_strs[] = { "A ", "A#", "B ", "C ", "C#", "D ", "D# ", "E ", "F ", "F#", "G ", "G#"};
+const char* note_strs[] = { "C ", "C#", "D ", "D# ", "E ", "F ", "F#", "G ", "G#", "A ", "A#", "B ", "C "};
 
 int notenum_to_oct(int notenum) {
-    return (notenum / 12) - 1;
+    return (notenum / 12) - 2;
 }
 
 const char* notenum_to_notestr(int notenum) {
