@@ -122,6 +122,9 @@ For both USB + Serial MIDI, add:
 - 1 - resistor 30 ohm (47 ohm also works)
 - 1 - resistor 220 ohm
 
+And if you've not used ["TRS MIDI"](https://minimidi.world/#types) and have normal 5-pin DIN MIDI jacks
+on your gear, you'll need some ["Type A" MIDI adapters like this](https://amzn.to/3R4YEBQ).
+
 You can attach the Pico & the OLED display how you like, but if using the 3d-printable "picostepseq_headers" case, you will also need:
 
 - 2 - 20-pin header socket ([Digikey](https://www.digikey.com/en/products/detail/sullins-connector-solutions/PPPC201LFBN-RC/810192), [Adafruit](https://www.adafruit.com/product/5583))
