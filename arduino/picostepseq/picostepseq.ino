@@ -102,7 +102,7 @@ void setup1() { }
 
 // core1 is only for MIDI output
 void loop1() {
-    seqr.update();
+    seqr.update();  // will call play_note_{on,off} callbacks
 }
 
 //  core0 is UI (buttons, knobs, display)
@@ -149,8 +149,8 @@ void setup() {
     encoder_switch.attach(encoderSW_pin, INPUT_PULLUP);
     encoder_switch.setPressedState(LOW);
 
+    // DISPLAY
     displaySetup();
-
 }
 
 void displaySetup() {
@@ -199,6 +199,12 @@ void loop()
 
     uint32_t now = millis();
 
+    if( encoder_push_millis > 0 && step_push_millis > 0 ) {
+        if( encoder_push_millis < step_push_millis ) { // encoder pushed first
+            Serial.println("SAVE sequence");
+        }
+    }
+
     // on encoder turn
     if( encoder_delta ) {
         // UI: encoder turn + push while step key held = change step's gate
@@ -210,9 +216,15 @@ void loop()
         }
         // UI: encoder turn while step key held = change step's note
         else if( step_push > -1 ) {
-            int note = seqr.steps[step_push].note;
-            note = constrain( note + encoder_delta, 1,127);
-            seqr.steps[step_push].note = note;
+            Step s = seqr.steps[step_push];
+            if( ! seqr.playing ) { // step preview note off
+                play_note_off( s.note, s.vel, s.gate, true);
+            }
+            s.note = constrain( s.note + encoder_delta, 1,127);
+            if( ! seqr.playing ) { // step preview note on
+                play_note_on( s.note, s.vel, s.gate, true);
+            }
+            seqr.steps[step_push] = s;
             step_edited = true;
         }
         // UI: encoder turn while encoder pushed = change tempo
@@ -264,7 +276,7 @@ void loop()
                 }
                 // UI: if not playing, step keys = play their notes
                 else {
-                    play_note_on( s.note, s.vel, s.gate, s.on );
+                    play_note_on( s.note, s.vel, s.gate, true );
                 }
             }
         }
@@ -292,7 +304,7 @@ void loop()
                 }
                 // UI: paused: step keys = play step notes
                 else {
-                    play_note_off( s.note, s.vel, s.gate, s.on );
+                    play_note_off( s.note, s.vel, s.gate, true );
                 }
             }
             step_push_millis = 0;
