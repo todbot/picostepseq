@@ -19,6 +19,7 @@ if four_per_line:
     bpm_text_pos = (0, 57)
     bpm_val_pos = (25, 57)
     trans_text_pos = (55, 57)
+    trans_val_pos = (80, 57)
     seqno_text_pos = (0, 48)
     play_text_pos = (110, 57)
     oct_text_offset = (15,3)  # four per line
@@ -32,6 +33,7 @@ else:
     bpm_text_pos = (0, 57)
     bpm_val_pos = (25, 57)
     trans_text_pos = (55, 57)
+    trans_val_pos = (80, 57)
     seqno_text_pos = (0, 45)
     play_text_pos = (110, 57)
     oct_text_offset = (3,12)
@@ -71,11 +73,13 @@ class SequencerDisplay(displayio.Group):
         self.bpm_text = label.Label(font2, text="bpm:", x=bpm_text_pos[0], y=bpm_text_pos[1])
         self.bpm_val = label.Label(font2, text="bpm:", x=bpm_val_pos[0], y=bpm_val_pos[1])
         self.transpose_text = label.Label(font2, text="trans", x=trans_text_pos[0], y=trans_text_pos[1])
+        self.transpose_val = label.Label(font2, text="+0", x=trans_val_pos[0], y=trans_val_pos[1])
         self.play_text = label.Label(font, text="||", x=play_text_pos[0], y=play_text_pos[1])
         self.append(self.bpm_text)
         self.append(self.bpm_val)
-        self.append(self.play_text)
         self.append(self.transpose_text)
+        self.append(self.transpose_val)
+        self.append(self.play_text)
         self.append(self.seqno_text)
 
     def update_ui_step(self, step=None, n=0, v=127, gate=8, on=True, selected=False):
@@ -106,7 +110,7 @@ class SequencerDisplay(displayio.Group):
         self.play_text.text = " >" if self.seq.playing else "||"
 
     def update_ui_transpose(self):
-        self.transpose_text.text = "trs:%+2d" % self.seq.transpose
+        self.transpose_val.text = "%+2d" % self.seq.transpose
 
     def update_ui_seqno(self, msg=None):
         self.seqno_text.text = msg or f"seq: {self.seq.seqno+1}"  # 1-index for humans, matches silkscreen
@@ -114,6 +118,7 @@ class SequencerDisplay(displayio.Group):
     def update_ui_all(self):
         self.update_ui_seqno()
         self.bpm_text.text = "bpm:"
+        self.transpose_text.text = "trs:"
         self.update_ui_bpm()
         self.update_ui_playing()
         self.update_ui_transpose()
