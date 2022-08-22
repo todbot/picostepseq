@@ -39,7 +39,7 @@ import usb_midi
 
 # local libraries in CIRCUITPY
 import winterbloom_smolmidi as smolmidi
-from sequencer import StepSequencer, ticks_ms, ticks_diff
+from sequencer import StepSequencer, ticks_ms
 
 if 'macropad' in board.board_id:
     from sequencer_display_macropad import SequencerDisplayMacroPad as SequencerDisplay
@@ -96,7 +96,6 @@ def midi_receive():
             now = ticks_ms()
             seqr.trigger_next(now)
 
-            #print("!", beat_millis)
             if midiclk_cnt % 24 == 0:  # once every quarter note
                 beat_millis = (now - midiclk_last_millis) / 4  # beat_millis is 1/16th note time
                 midiclk_last_millis = now
@@ -170,13 +169,12 @@ sequence_load(0)
 seqr_display.update_ui_all()
 
 # various state for UI handling
-last_debug_millis = 0
-encoder_val_last = hw.encoder.position  # needed to calculate encoder_delta
+encoder_val_last = hw.encoder.position # needed to calculate encoder_delta
 encoder_push_millis = 0  # when was encoder pushed, 0 == no push
 encoder_delta = 0  # how much encoder was turned, 0 == no turn
 step_push = -1  # which step button is being pushed, -1 == no push
-step_push_millis = 0  # when was a step button pushed (extra? maybe
-step_edited = False
+step_push_millis = 0  # when was a step button pushed
+step_edited = False  # was a step edited while it was held?
 
 print("Ready.")
 
@@ -229,7 +227,7 @@ while True:
             step_edited = True
             seqr_display.update_ui_step( step_push, n, v, gate, on, True)
 
-        # UI:  encoder turned while step key held == change step's note
+        # UI: encoder turned while step key held == change step's note
         elif step_push > -1:  # step key pressed
             (n,v,gate,on) = seqr.steps[ step_push ]
             if not seqr.playing:
@@ -260,11 +258,11 @@ while True:
     encsw = hw.encoder_switch.events.get()
     if encsw:
         if encsw.pressed:
-            print("encoder_switch: press")
+            #print("encoder_switch: press")
             encoder_push_millis = now  # save when we pushed encoder
 
         if encsw.released:
-            print("encoder_switch: release")
+            #print("encoder_switch: release")
             if step_push == -1 and encoder_delta == 0:  # step key is not pressed and no turn
                 # UI: encoder tap, with no key == play/pause
                 if ticks_ms() - encoder_push_millis < 300:
@@ -312,13 +310,11 @@ while True:
                 if encoder_push_millis > 0:   # UI load /save sequence mode
                     # UI: encoder push + hold step key = save sequence
                     if now - step_push_millis > 1000:
-                        print("save sequence:", step_push)
                         sequence_save( step_push )
                         seqr_display.update_ui_seqno()
                         seqr_display.update_ui_step()
                     # UI: encoder push + tap step key = load sequence
                     else:
-                        print("load sequence:", step_push)
                         sequence_load( step_push )
                         seqr_display.update_ui_seqno()
                         if not seqr.playing:
@@ -345,6 +341,6 @@ while True:
         except ValueError:  # undefined macropad key was pressed, ignore
             pass
 
-    #
-    #emillis = ticks_ms() - now
-    #print("emillis:",emillis)
+    emillis = ticks_ms() - now
+    if emillis > 2:
+        print("emillis:",emillis, ticks_ms())
