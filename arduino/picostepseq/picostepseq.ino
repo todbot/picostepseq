@@ -314,7 +314,7 @@ void loop()
     }
 
     // DISPLAY update
-    displayUpdate();
+    displayUpdate(step_push);
 
 }
 
@@ -429,7 +429,7 @@ const char* notenum_to_notestr(int notenum) {
     return note_strs[ notenum % 12 ];
 }
 
-void displayUpdate()
+void displayUpdate(int selected_step)
 {
     display.clearDisplay();
     display.setFont(&myfont);
@@ -443,6 +443,8 @@ void displayUpdate()
         display.print( nstr );
         display.setCursor( x + oct_text_offset[0], y + oct_text_offset[1] );
         display.printf( "%1d", o );
+        display.setCursor(x + edit_text_offset[0], y + edit_text_offset[1] );
+        display.print( (i==selected_step) ? '^' : (s.on) ? '*': ' ');
         int gate_w = 1 + (s.gate * gate_bar_width / 16);
         display.fillRect( x + gate_bar_offset[0], y + gate_bar_offset[1], gate_w, gate_bar_height, WHITE);
     }
