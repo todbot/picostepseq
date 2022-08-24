@@ -103,7 +103,7 @@ Links also included below for major parts
 
 For basic USB MIDI functionality:
 
-- 1 - "picostepseq" PCB ([OSHpark](https://oshpark.com/shared_projects/vPWjBrmO), I have some to give away, msg me!)
+- 1 - "picostepseq" PCB ([OSHpark](https://oshpark.com/shared_projects/vPWjBrmO), also see "hardware" directory for gerbers)
 - 1 - Raspberry Pi Pico ([Adafruit](https://www.adafruit.com/product/4864), [Digikey](https://www.digikey.com/en/products/detail/raspberry-pi/SC0915/13624793))
 - 1 - 0.96" I2C OLED SSD1306 128x64 display ([Amazon](https://amzn.to/3K1ZAoo))
   - w/ pins in order GND, VCC, SCL, SDA; some have GND & VCC swapped
