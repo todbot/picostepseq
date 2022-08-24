@@ -205,9 +205,6 @@ while True:
         encoder_delta = (encoder_val - encoder_val_last)
         encoder_val_last = encoder_val
 
-    # idea: pull out all UI options into state variables
-    # encoder_push_and_turn_push = encoder_delta and encoder_push_millis > 0
-
     # UI: encoder push + hold step key = save sequence
     #print(encoder_push_millis, now-step_push_millis)
     if encoder_push_millis > 0 and step_push_millis > 0:
@@ -231,12 +228,12 @@ while True:
         elif step_push > -1:  # step key pressed
             (n,v,gate,on) = seqr.steps[ step_push ]
             if not seqr.playing:
-                play_note_off( n, v, gate, True)
+                play_note_off( n, v, gate, True)  # step note preview note off
 
             n = min(max(n + encoder_delta, 1), 127)
 
             if not seqr.playing:
-                play_note_on( n, v, gate, True )
+                play_note_on( n, v, gate, True )  # step note preview note on
 
             seqr.steps[ step_push ] = (n,v,gate,on)
             step_edited = True
@@ -290,7 +287,7 @@ while True:
             (n,v,gate,on) = seqr.steps[step_push]
 
             if key.pressed:
-                print("+ press", key.key_number, "step_push:",step_push)
+                #print("+ press", key.key_number, "step_push:",step_push)
                 step_push_millis = ticks_ms()
 
                 # encoder push + key push = load/save sequence ## FIXME need to clean this up
@@ -302,10 +299,10 @@ while True:
                         pass
                     # UI: if not playing, step keys == play their pitches
                     else:
-                        play_note_on( n, v, gate, True )
+                        play_note_on( n, v, gate, True )  # step note preview note on
 
             elif key.released:
-                print("- release", key.key_number, step_push)
+                #print("- release", key.key_number, step_push)
 
                 if encoder_push_millis > 0:   # UI load /save sequence mode
                     # UI: encoder push + hold step key = save sequence
@@ -331,7 +328,7 @@ while True:
                     else:
                         # UI: if not playing, step key == play their pitches
                         (n,v,gate,on) = seqr.steps[step_push]
-                        play_note_off( n, v, gate, True )
+                        play_note_off( n, v, gate, True )   # step note preview note on
 
                 seqr_display.update_ui_step( step_push, n, v, gate, on, False)
                 step_push = -1  # say we are done with key
