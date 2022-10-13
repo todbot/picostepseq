@@ -338,6 +338,6 @@ while True:
         except ValueError:  # undefined macropad key was pressed, ignore
             pass
 
-    emillis = ticks_ms() - now
-    if emillis > 2:
-        print("emillis:",emillis, ticks_ms())
+#    emillis = ticks_ms() - now
+#    if emillis > 2:
+#        print("emillis:",emillis, ticks_ms())
