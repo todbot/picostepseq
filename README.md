@@ -158,6 +158,12 @@ you can experiment with the sequencer without building any hardware! The code wi
 if it's running on a MacroPad. Rotate the MacroPad so the display is on the left,
 then the sequencer keys are arranged as two rows of four.
 
+Here's a demo video of an early dev version of the sequencer running on the MacroPad:
+
+https://user-images.githubusercontent.com/274093/196534059-c9460560-1983-42a2-818f-853e90acd9bf.mp4
+
+
+
 ## PCB layout
 
 This is the original version that has a typo on the MIDI jacks.
