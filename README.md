@@ -9,9 +9,12 @@ which are easily solderable by hand.
 <a href="./docs/picostepseq_photo1.jpg"><img width=400 src="./docs/picostepseq_photo1.jpg"/></a>
 <a href="./docs/picostepseq_render2.jpg"><img width=400 src="./docs/picostepseq_render2.jpg"/></a>
 
-## Demo video
+## Demo videos
 
 https://user-images.githubusercontent.com/274093/185005269-afb4c3f7-0ca1-40c8-a17d-6e4756943d87.mov
+
+https://user-images.githubusercontent.com/274093/196536711-abd25514-53b9-4710-8ff6-1fa3559f0028.mp4
+
 
 ## How to use
 
