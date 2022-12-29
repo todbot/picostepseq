@@ -9,9 +9,12 @@ which are easily solderable by hand.
 <a href="./docs/picostepseq_photo1.jpg"><img width=400 src="./docs/picostepseq_photo1.jpg"/></a>
 <a href="./docs/picostepseq_render2.jpg"><img width=400 src="./docs/picostepseq_render2.jpg"/></a>
 
-## Demo video
+## Demo videos
 
 https://user-images.githubusercontent.com/274093/185005269-afb4c3f7-0ca1-40c8-a17d-6e4756943d87.mov
+
+https://user-images.githubusercontent.com/274093/196536711-abd25514-53b9-4710-8ff6-1fa3559f0028.mp4
+
 
 ## How to use
 
@@ -157,6 +160,12 @@ Thanks to [Winterbloom](https://github.com/wntrblm) and [@theacodes](https://git
 you can experiment with the sequencer without building any hardware! The code will auto-detect
 if it's running on a MacroPad. Rotate the MacroPad so the display is on the left,
 then the sequencer keys are arranged as two rows of four.
+
+Here's a demo video of an early dev version of the sequencer running on the MacroPad:
+
+https://user-images.githubusercontent.com/274093/196534059-c9460560-1983-42a2-818f-853e90acd9bf.mp4
+
+
 
 ## PCB layout
 
