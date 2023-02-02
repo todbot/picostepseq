@@ -15,6 +15,8 @@ https://user-images.githubusercontent.com/274093/185005269-afb4c3f7-0ca1-40c8-a1
 
 https://user-images.githubusercontent.com/274093/196536711-abd25514-53b9-4710-8ff6-1fa3559f0028.mp4
 
+Also featured in [MagPi Magazine #123](https://magpi.raspberrypi.com/articles/picostepseq-rp2040-music-maker), and [in print too](https://magpi.raspberrypi.com/issues/123)!
+
 
 ## How to use
 
