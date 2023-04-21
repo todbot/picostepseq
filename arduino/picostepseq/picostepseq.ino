@@ -3,6 +3,9 @@
  * 15 Aug 2022 - @todbot / Tod Kurt
  * Part of https://github.com/todbot/picostepseq/
  *
+ * Note: This is a very fast implemenation of the CircuitPython PicoStepSeq firmware
+ *       It is not complete.
+ *
  * Libraries needed (all available via Library Manager):
  * - Bounce2 -- https://github.com/thomasfredericks/Bounce2
  * - RotaryEncoder -- http://www.mathertel.de/Arduino/RotaryEncoderLibrary.aspx
@@ -11,9 +14,17 @@
  * - MIDI -- https://github.com/FortySevenEffects/arduino_midi_library
  * - ArduinoJson -- https://arduinojson.org/
  *
- * IDE change:
- * - Select "Tools / Flash Size: 2MB (Sketch: 1MB / FS: 1MB)
- * - Select "Tools / USB Stack: Adafruit TinyUSB"
+ * To upload:
+ * - Use Arduino IDE 1.8.19
+ * - Install arduino-pico Arduino core https://arduino-pico.readthedocs.io/en/latest/install.html
+ * - Install the "PicoLittleFS tool" as described here:
+ *    https://arduino-pico.readthedocs.io/en/latest/fs.html#uploading-files-to-the-littlefs-file-system
+ * - Once it's installed, restart the Arduino IDE
+ * - Open up the 'picostepseq/arduino/picostep' sketch
+ * - In "Tools", set "Flash Size: 2MB (Sketch: 1MB / FS: 1MB)"
+ * - In "Tools", set "Tools / USB Stack: Adafruit TinyUSB"
+ * - *In "Tools", choose "Pico LittleFS Data Upload" (this will upload default 'saved_sequences.json)
+ * - Finally you can program the sketch to the Pico with "Upload"
  *
  **/
 
@@ -31,6 +42,8 @@
 
 #define myfont helvnCB6pt7b   // sigh
 #define myfont2 ter_u12n7b
+
+int midi_chan = 1;  // MIDI channel to send/receive on
 
 const int numsteps = 8;
 const int numseqs = 8;
@@ -84,8 +97,8 @@ const char* save_file = "/saved_sequences.json";
 void play_note_on( uint8_t note, uint8_t vel, uint8_t gate, bool on ) {
     Serial.printf("play_note_on: %d %d %d %d\n", note,vel,gate,on);
     if( on ) {
-        MIDIusb.sendNoteOn(note, vel, 1); // 1?
-        MIDIserial.sendNoteOn(note, vel, 1); // 1?
+        MIDIusb.sendNoteOn(note, vel, midi_chan); // 1?
+        MIDIserial.sendNoteOn(note, vel, midi_chan); // 1?
     }
 }
 
@@ -93,8 +106,8 @@ void play_note_on( uint8_t note, uint8_t vel, uint8_t gate, bool on ) {
 void play_note_off(uint8_t note, uint8_t vel, uint8_t gate, bool on ) {
     Serial.printf("play_note_off: %d %d %d %d\n", note,vel,gate,on);
     // always send note off for now
-    MIDIusb.sendNoteOff(note, vel, 1);
-    MIDIserial.sendNoteOff(note, vel, 1);
+    MIDIusb.sendNoteOff(note, vel, midi_chan);
+    MIDIserial.sendNoteOff(note, vel, midi_chan);
 }
 
 // core1 is only for MIDI output
@@ -182,7 +195,7 @@ void loop()
         Step s = seqr.steps[i];
         int v = 0;                         // UI: off = muted
         if( i == seqr.stepi ) { v = 255; } // UI: bright red = indicates sequence postion
-        else if( s.on )       { v = 20;  } // UI: dim red = indicates mute/unmute state
+        else if( s.on )       { v = 40;  } // UI: dim red = indicates mute/unmute state
         v = max( led_vals[i] - led_fade, v); // nice 80s fade
         led_vals[i] = v;
         analogWrite(led_pins[i], v);
@@ -231,7 +244,7 @@ void loop()
         else if( encoder_push_millis > 0 ) {
             tempo = tempo + encoder_delta;
             seqr.set_tempo( tempo );
-            Serial.printf("TEMPO: %d %f\n", seqr.tempo(), seqr.tempo());
+            Serial.printf("TEMPO: %d %f\n", (int)seqr.tempo(), seqr.tempo());
         }
         // UI: encoder turn = change transpose
         else {
@@ -361,6 +374,17 @@ void sequences_read() {
     File file = LittleFS.open( save_file, "r");
     if( !file ) {
         Serial.println("sequences_read: no sequences file");
+        // make up some filler sequences
+        for( int j=0; j < numseqs; j++ ) {
+          for( int i=0; i< numsteps; i++ ) {
+            Step s;
+            s.note = 60 + random(-12,12);
+            s.vel  = 127;
+            s.gate = 10;
+            s.on   = true;
+            sequences[j][i] = s;
+          }
+        }
         return;
     }
 
