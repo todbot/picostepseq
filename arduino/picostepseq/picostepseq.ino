@@ -40,15 +40,15 @@
 #include "fonts/helvnCB6pt7b.h"
 #include "fonts/ter_u12n7b.h" // CirPy's default displayio font, it seems
 
+#include "Sequencer.hpp"
+
 #define myfont helvnCB6pt7b   // sigh
 #define myfont2 ter_u12n7b
 
 int midi_chan = 1;  // MIDI channel to send/receive on
+const char* save_file = "/saved_sequences.json";
 
-const int numsteps = 8;
 const int numseqs = 8;
-
-#include "Sequencer.hpp"
 
 // begin hardware definitions
 const int dw = 128;
@@ -71,7 +71,7 @@ const int midi_rx_pin = 17;
 // end hardware definitions
 
 int led_vals[numsteps];
-int led_fade = 20;
+int led_fade = 25;
 
 Bounce2::Button keys[numsteps];
 Bounce2::Button encoder_switch;
@@ -91,11 +91,10 @@ StepSequencer seqr;
 
 Step sequences[numseqs][numsteps];
 
-const char* save_file = "/saved_sequences.json";
 
 // callback used by Sequencer to trigger note on
 void play_note_on( uint8_t note, uint8_t vel, uint8_t gate, bool on ) {
-    Serial.printf("play_note_on: %d %d %d %d\n", note,vel,gate,on);
+    Serial.printf("noteOn:  %d %d %d %d\n", note,vel,gate,on);
     if( on ) {
         MIDIusb.sendNoteOn(note, vel, midi_chan); // 1?
         MIDIserial.sendNoteOn(note, vel, midi_chan); // 1?
@@ -104,17 +103,54 @@ void play_note_on( uint8_t note, uint8_t vel, uint8_t gate, bool on ) {
 
 // callback used by Sequencer to trigger note off
 void play_note_off(uint8_t note, uint8_t vel, uint8_t gate, bool on ) {
-    Serial.printf("play_note_off: %d %d %d %d\n", note,vel,gate,on);
+    Serial.printf("noteOff: %d %d %d %d\n", note,vel,gate,on);
     // always send note off for now
     MIDIusb.sendNoteOff(note, vel, midi_chan);
     MIDIserial.sendNoteOff(note, vel, midi_chan);
 }
 
-// core1 is only for MIDI output
+uint8_t midiclk_cnt = 0;
+uint32_t midiclk_last_millis = 0;
+
+void handle_midi_songpos(unsigned int beats) {
+    Serial.printf("songpos:%d\n", beats);
+    if( beats == 0 ) {
+        seqr.stepi = 0;
+    }
+}
+void handle_midi_start() {
+    seqr.ext_trigger = true;
+    seqr.play();
+    Serial.println("start");
+    midiclk_cnt = 0;
+}
+void handle_midi_stop() {
+    seqr.stop();
+    Serial.println("stop");
+}
+void handle_midi_clock() {
+    // once every 1/16th note (24 pulses per quarter note => 6 pulses per 16th note)
+    if( midiclk_cnt % 6 == 0 ) {
+        uint32_t now = millis();
+        seqr.trigger_ext(now);
+
+        // once every quarter note (just so we aggregate some time to minimize error)
+        if( midiclk_cnt % 24 == 0 ) {
+            uint32_t step_millis = (now - midiclk_last_millis) / 4;  // step_millis is 1/16th note time
+            midiclk_last_millis = now;
+            seqr.step_millis = step_millis;
+            midiclk_cnt = 0;
+        }
+    }
+    midiclk_cnt++;
+}
+
+// core1 is only for MIDI in/output
 void setup1() { }
 
-// core1 is only for MIDI output
+// core1 is only for MIDI in/out
 void loop1() {
+    MIDIusb.read();
     seqr.update();  // will call play_note_{on,off} callbacks
 }
 
@@ -134,6 +170,15 @@ void setup() {
 
     MIDIusb.turnThruOff();    // turn off echo
     MIDIserial.turnThruOff(); // turn off echo
+
+    MIDIusb.setHandleClock(handle_midi_clock);
+    MIDIusb.setHandleStart(handle_midi_start);
+    MIDIusb.setHandleStop(handle_midi_stop);
+    MIDIusb.setHandleSongPosition(handle_midi_songpos);
+    MIDIserial.setHandleClock(handle_midi_clock);
+    MIDIserial.setHandleStart(handle_midi_start);
+    MIDIserial.setHandleStop(handle_midi_stop);
+    MIDIserial.setHandleSongPosition(handle_midi_songpos);
 
     sequences_read();
     sequence_load( seqr.seqno ); // 0
@@ -186,6 +231,7 @@ uint32_t encoder_push_millis;
 uint32_t step_push_millis;
 int step_push = -1;
 bool step_edited = false;
+char seq_meta[6]; // 5 chars + nul
 
 // main UI loop
 void loop()
@@ -214,7 +260,7 @@ void loop()
 
     if( encoder_push_millis > 0 && step_push_millis > 0 ) {
         if( encoder_push_millis < step_push_millis ) { // encoder pushed first
-            Serial.println("SAVE sequence");
+            //Serial.println("SAVE sequence");
         }
     }
 
@@ -299,6 +345,7 @@ void loop()
                 // UI: encoder push + hold step key = save sequence
                 if( now - step_push_millis > 1000 ) {
                     sequence_save( step_push );
+                    strcpy(seq_meta, "saved");
                 }
                 // UI: encoder push + tap step key = load sequence
                 else {
@@ -360,6 +407,7 @@ void sequences_write() {
     }
     file.close();
     serializeJson(doc, Serial);
+    Serial.println("sequences saved");
 }
 
 // read all sequences from "disk"
@@ -430,12 +478,13 @@ void sequence_save(int seq_num) {
 
 // --- display details
 
-////
+//// {x,y} locations of screen items
 const int step_text_pos[] = { 0,12, 16,12, 32,12, 48,12,  64,12, 80,12, 96,12, 112,12 };
 const int bpm_text_pos[] = {0, 57};
 const int bpm_val_pos[] = {25, 57};
 const int trans_text_pos[] = {55, 57};
 const int seqno_text_pos[] = {0, 45};
+const int seq_meta_pos[]   = {60, 45};
 const int play_text_pos[] = {110, 57};
 const int oct_text_offset[] = {3,12};
 const int gate_bar_offset[] = {0,-12};
@@ -489,6 +538,11 @@ void displayUpdate(int selected_step)
     // seqno
     display.setCursor(seqno_text_pos[0], seqno_text_pos[1]);
     display.printf("seq:%d", seqr.seqno + 1); // user sees 1-8
+
+    // seq meta
+    display.setCursor(seq_meta_pos[0], seq_meta_pos[1]);
+    display.print( seq_meta ); // FIXME: this is onscren too briefly and what does CirPy version do?
+    strcpy(seq_meta,"     ");
 
     // play/pause
     display.setCursor(play_text_pos[0], play_text_pos[1]);
