@@ -91,13 +91,37 @@ The firmware lives in the `circuitpython/picostepseq` directory.
 
 1. Copy all files in the `circuitpython/picostepseq` directory to the CIRCUITPY disk.
 
-2. Install the libraries `adafruit_displayio_ssd1306` and `adafruit_display_text`.
+   If using a Mac terminal, you can do:
+   ```sh
+   cd picostepseq/circuitpython/picostepseq
+   cp -rX * /Volumes/CIRUITPY
+   ```
 
-  The command-line tool `circup` is very useful to install libraries:
+2. Install the CircuitPython libraries `adafruit_displayio_ssd1306` and `adafruit_display_text`
 
-  `circup install adafruit_displayio_ssd1306 adafruit_display_text`
+   You can use the `circup` tool in Terminal for this:
+
+   ```sh
+   circup install adafruit_displayio_ssd1306 adafruit_display_text
+   ```
+
+   If you do not have `circup`, then you will need to copy the following files/dirs from the
+   [Adafruit_CircuitPython_Bundle 8.x](https://circuitpython.org/libraries):
+   ```
+   adafruit_bitmap_font/
+   adafruit_display_text/
+   adafruit_displayio_ssd1306.mpy
+   ```
 
 3. Reset the board and the sequencer should come up!
+
+   (The reset is important so that `boot.py` is run, which allows you to save sequences)
+
+
+### Installing the Firmware (Arduino)
+
+The Arduino version is a bit more tricky to get going. See the top of the `picostepseq.ino` file for details.
+
 
 
 ## Bill of Materials
