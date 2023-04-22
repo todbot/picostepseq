@@ -144,6 +144,9 @@ void handle_midi_clock() {
     }
     midiclk_cnt++;
 }
+void handle_midi_note_on_test(byte channel, byte note, byte velocity) {
+    Serial.printf("MIDI NOTE ON: %d %d %d\n", channel, note, velocity);
+}
 
 // core1 is only for MIDI in/output
 void setup1() { }
@@ -151,6 +154,8 @@ void setup1() { }
 // core1 is only for MIDI in/out
 void loop1() {
     MIDIusb.read();
+    MIDIserial.read();
+
     seqr.update();  // will call play_note_{on,off} callbacks
 }
 
@@ -175,10 +180,13 @@ void setup() {
     MIDIusb.setHandleStart(handle_midi_start);
     MIDIusb.setHandleStop(handle_midi_stop);
     MIDIusb.setHandleSongPosition(handle_midi_songpos);
+
     MIDIserial.setHandleClock(handle_midi_clock);
     MIDIserial.setHandleStart(handle_midi_start);
     MIDIserial.setHandleStop(handle_midi_stop);
     MIDIserial.setHandleSongPosition(handle_midi_songpos);
+
+    MIDIserial.setHandleNoteOn(handle_midi_note_on_test);
 
     sequences_read();
     sequence_load( seqr.seqno ); // 0
@@ -479,15 +487,15 @@ void sequence_save(int seq_num) {
 // --- display details
 
 //// {x,y} locations of screen items
-const int step_text_pos[] = { 0,12, 16,12, 32,12, 48,12,  64,12, 80,12, 96,12, 112,12 };
+const int step_text_pos[] = { 0,15, 16,15, 32,15, 48,15,  64,15, 80,15, 96,15, 112,15 };
 const int bpm_text_pos[] = {0, 57};
 const int bpm_val_pos[] = {25, 57};
 const int trans_text_pos[] = {55, 57};
 const int seqno_text_pos[] = {0, 45};
 const int seq_meta_pos[]   = {60, 45};
 const int play_text_pos[] = {110, 57};
-const int oct_text_offset[] = {3,12};
-const int gate_bar_offset[] = {0,-12};
+const int oct_text_offset[] = {3,10};
+const int gate_bar_offset[] = {0,-15};
 const int gate_bar_width = 14;
 const int gate_bar_height = 4;
 const int edit_text_offset[] = {3,22};
