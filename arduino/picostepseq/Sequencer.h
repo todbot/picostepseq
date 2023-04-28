@@ -71,88 +71,82 @@ public:
     }
 
     void update() {
-        //uint32_t now = millis();
-        //uint16_t delta_t = now - last_step_millis;
-        uint32_t nowm = micros();
-        uint16_t delta_t = nowm - last_tick_micros;
-        if( delta_t < tick_micros ) {
-            return;
-        }
-        last_tick_micros = nowm;
+        uint32_t now_micros = micros();
+        uint16_t delta_t = now_micros - last_tick_micros;
+        if( delta_t < tick_micros ) { return; }  // not yet
+        last_tick_micros = now_micros;
         //int16_t ddt = delta_t - tick_micros; // typically ranges 0-8, we are good
 
+        // if we have a held note and it's time to turn it off, turn it off
+        if( held_gate_millis != 0 && millis() >= held_gate_millis ) {
+            held_gate_millis = 0;
+            off_func( held_note.note, held_note.vel, held_note.gate, held_note.on);
+        }
+
+        // this is kind of a hack, maybe use rp2040 fifo?
         // handle communication from UI core to sequencer/MIDI core
         // translates 'playstate_change' to 'playing' and sending clocks
         if( playstate_change == START ) {
             playstate_change = NONE;
-            //playing = true;
             if(send_clock) { clk_func( START, 0 ); }
         }
         else if( playstate_change == STOP ) {
             playstate_change = NONE;
-            //playing = false;
             if(send_clock) { clk_func( STOP, 0); }
+        }
+
+        if( ticki == 0 ) { // do a step
+
+            // execute below only every ticks_per_step ticks
+            if( ext_clock ) {
+                // do nothing, let midi clock trigger notes, but fall back to
+                // internal clock if not externally clocked for a while
+                if( delta_t > tick_micros * 1000 * 16 ) { // FIXME
+                    ext_clock = false;
+                    Serial.println("Turning EXT CLOCK off");
+                }
+            }
+            else {
+                trigger(now_micros, delta_t);
+            }
+
         }
 
         if( send_clock && playing ) {
             clk_func( RUN, 0 );
         }
 
-        ticki = (ticki + 1) % ticks_per_step;  // increment our ticks in a step counter: 0,1,2,3,4,5,0,1,2,3,4,5
-
-        if( ticki != 1 ) { // this should 'ticki!=0', but we just incremented
-            return; // not step time yet
-        }
-
-        uint32_t now = millis();
-
-        // if we have a held note and it's time to turn it off, turn it off
-        if( held_gate_millis != 0 && now >= held_gate_millis ) {
-            held_gate_millis = 0;
-            off_func( held_note.note, held_note.vel, held_note.gate, held_note.on);
-        }
-
-        //if( delta_t >= step_millis ) {
-        if( ext_clock ) {
-            // do nothing, let midi clock trigger notes, but fall back to
-            // internal clock if not externally clocked for a while
-            if( delta_t > tick_micros * 16 * 1000 ) { // FIXME
-                ext_clock = false;
-                Serial.println("Turning EXT CLOCK off");
-            }
-        }
-        else {
-            trigger(now, delta_t);
-        }
-        //}
+        // increment our ticks-in-a-step counter: 0,1,2,3,4,5,0,1,2,3,4,5
+        ticki = (ticki + 1) % ticks_per_step;
     }
 
     // Trigger next step in sequence (and make externally clocked)
-    void trigger_ext(uint32_t now) {
+    void trigger_ext(uint32_t now_micros) {
         ext_clock = true;
-        trigger(now, 0); // FIXME: was step_millis);
+        trigger(now_micros, 0); // FIXME: "0" was step_millis);
     }
 
     // Trigger step in sequence, when internally clocked
     //void trigger(uint32_t now, uint16_t delta_t) {
-    void trigger(uint32_t now, uint16_t delta_t) {
+    void trigger(uint32_t now_micros, uint16_t delta_t) {
         if( !playing ) { return; }
         (void)delta_t; // silence unused variable
 
         Step s = steps[stepi];
         s.note += transpose;
 
-        if( held_gate_millis )  { // just in case we have an old note hanging around
-            Serial.println("HELD NOTE");
-            off_func( held_note.note, held_note.vel, held_note.gate, held_note.on);
-        }
+        // if( held_gate_millis )  { // just in case we have an old note hanging around
+        //    Serial.println("\nHELD NOTE\n");
+        //    off_func( held_note.note, held_note.vel, held_note.gate, held_note.on);
+        //}
 
         on_func(s.note, s.vel, s.gate, s.on);
-        //uint16_t err_t = delta_t - beat_millis; // may not need this if we run sequencer on rp2040 core1
-        //last_step_millis = now; // - err_t - fudge;
+
         held_note = s;
-        uint32_t step_millis = tick_micros / 1000; // convert micros to millis
-        held_gate_millis = now + ((s.gate * step_millis) / 16);
+        uint32_t step_micros = ticks_per_step * tick_micros;
+        uint32_t gate_micros = s.gate * step_micros / 16;
+        held_gate_millis = (now_micros + gate_micros) / 1000;
+
         stepi = (stepi + 1) % numsteps;
     }
 
@@ -165,10 +159,9 @@ public:
     void play() {
         stepi = 0;
         ticki = 0;
-        //last_step_millis = millis() - step_millis;
-        playing = true;
-        last_tick_micros = micros() - tick_micros*2; // FIXME: hmmm
         playstate_change = START;
+        last_tick_micros = micros() - tick_micros*2; // FIXME: hmmm
+        playing = true;
         //if( send_clock ) {
         //    clk_func( START, 0);
         //}
@@ -176,8 +169,8 @@ public:
 
     // signal to sequencer/MIDI core we want to stop/pause playing
     void pause() {
-        playing = false;
         playstate_change = STOP;
+        playing = false;
         //if( send_clock ) {
         //    clk_func( STOP, 0);
         //}
@@ -185,9 +178,9 @@ public:
 
     // signal to sequencer/MIDI core we want to stop playing
     void stop() {
-        //playing = false;
         stepi = 0;
         last_tick_micros = 0;
+        playing = false;
         playstate_change = STOP;
         //if( send_clock ) {
         //    clk_func( STOP, 0);

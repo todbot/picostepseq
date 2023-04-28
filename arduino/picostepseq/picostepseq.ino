@@ -48,7 +48,7 @@
 uint8_t midi_chan = 1;  // MIDI channel to send/receive on
 const char* save_file = "/saved_sequences.json";
 const bool send_midi_clock = true;
-const bool midi_debug = true;
+const bool midi_debug = false;
 
 bool midi_uart_enable = true; // unused
 
@@ -120,11 +120,11 @@ void send_clock(clock_type_t type, int pos) {
         MIDIusb.sendStart();
         MIDIserial.sendStart();
     }
-    else if( type == STOP) {
+    else if( type == STOP ) {
         MIDIusb.sendStop();
         MIDIserial.sendStop();
     }
-    else if( type == RUN) {     // else RUN, send clock
+    else if( type == RUN ) {
         MIDIusb.sendClock();
         MIDIserial.sendClock();
     }
@@ -184,10 +184,10 @@ void setup() {
     MIDIusb.turnThruOff();    // turn off echo
     MIDIserial.turnThruOff(); // turn off echo
 
-    //MIDIusb.setHandleClock(handle_midi_in_clock);
-    //MIDIusb.setHandleStart(handle_midi_in_start);
-    //MIDIusb.setHandleStop(handle_midi_in_stop);
-    //MIDIusb.setHandleSongPosition(handle_midi_in_songpos);
+    MIDIusb.setHandleClock(handle_midi_in_clock);
+    MIDIusb.setHandleStart(handle_midi_in_start);
+    MIDIusb.setHandleStop(handle_midi_in_stop);
+    MIDIusb.setHandleSongPosition(handle_midi_in_songpos);
 
     MIDIserial.setHandleClock(handle_midi_in_clock);
     MIDIserial.setHandleStart(handle_midi_in_start);
@@ -195,7 +195,6 @@ void setup() {
     MIDIserial.setHandleSongPosition(handle_midi_in_songpos);
 
     //MIDIserial.setHandleNoteOn(handle_midi_note_on_test);
-
 }
 
 // core0 is only for MIDI in/out
