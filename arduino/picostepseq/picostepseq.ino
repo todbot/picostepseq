@@ -1,10 +1,8 @@
 /**
- * picostepseq.ino  -- basic picostepseq functionality in Arduino
+ * picostepseq.ino  -- picostepseq MIDI step sequencer in Arduino
+ * 28 Apr 2023 - @todbot / Tod Kurt
  * 15 Aug 2022 - @todbot / Tod Kurt
  * Part of https://github.com/todbot/picostepseq/
- *
- * Note: This is a very fast implemenation of the CircuitPython PicoStepSeq firmware
- *       It is not complete.
  *
  * Libraries needed (all available via Library Manager):
  * - Bounce2 -- https://github.com/thomasfredericks/Bounce2
@@ -17,14 +15,9 @@
  * To upload:
  * - Use Arduino IDE 1.8.19
  * - Install arduino-pico Arduino core https://arduino-pico.readthedocs.io/en/latest/install.html
- * - Install the "PicoLittleFS tool" as described here:
- *    https://arduino-pico.readthedocs.io/en/latest/fs.html#uploading-files-to-the-littlefs-file-system
- * - Once it's installed, restart the Arduino IDE
- * - Open up the 'picostepseq/arduino/picostep' sketch
  * - In "Tools", set "Flash Size: 2MB (Sketch: 1MB / FS: 1MB)"
  * - In "Tools", set "Tools / USB Stack: Adafruit TinyUSB"
- * - *In "Tools", choose "Pico LittleFS Data Upload" (this will upload default 'saved_sequences.json)
- * - Finally you can program the sketch to the Pico with "Upload"
+ * - Program the sketch to the Pico with "Upload"
  *
  **/
 
@@ -41,16 +34,18 @@
 #include "fonts/ter_u12n7b.h" // CirPy's default displayio font, it seems
 
 #include "Sequencer.h"
+#include "saved_sequences_json.h" // to bootstrap the "saved_sequences.json" file
 
 #define myfont helvnCB6pt7b   // sigh
 #define myfont2 ter_u12n7b
 
 uint8_t midi_chan = 1;  // MIDI channel to send/receive on
+
 const char* save_file = "/saved_sequences.json";
 const bool send_midi_clock = true;
 const bool midi_debug = false;
 
-bool midi_uart_enable = true; // unused
+//bool midi_uart_enable = true; // unused
 
 const int numseqs = 8;
 
@@ -124,7 +119,7 @@ void send_clock(clock_type_t type, int pos) {
         MIDIusb.sendStop();
         MIDIserial.sendStop();
     }
-    else if( type == RUN ) {
+    else if( type == CLOCK ) {
         MIDIusb.sendClock();
         MIDIserial.sendClock();
     }
@@ -139,14 +134,23 @@ void handle_midi_in_songpos(unsigned int beats) {
 }
 void handle_midi_in_start() {
     seqr.play();
-    if(midi_debug) { Serial.println("midi in start"); }
     midiclk_cnt = 0;
+    if(send_midi_clock) {
+        send_clock(START, 0);
+    }
+    if(midi_debug) { Serial.println("midi in start"); }
 }
 void handle_midi_in_stop() {
     seqr.stop();
+    if(send_midi_clock) {
+        send_clock(STOP, 0);
+    }
     if(midi_debug) { Serial.println("midi in stop"); }
 }
 void handle_midi_in_clock() {
+    if(send_midi_clock) {
+        send_clock(CLOCK, 0);
+    }
     // once every 1/16th note (24 ticks (pulses) per quarter note => 6 pulses per 16th note)
     if( midiclk_cnt % ticks_per_step == 0 ) {  // ticks_per_step = 6
         uint32_t now = millis();
@@ -197,7 +201,9 @@ void setup() {
     //MIDIserial.setHandleNoteOn(handle_midi_note_on_test);
 }
 
-// core0 is only for MIDI in/out
+//
+// --- core0 is only for MIDI in/out
+//
 void loop() {
     MIDIusb.read();
     MIDIserial.read();
@@ -207,7 +213,7 @@ void loop() {
 
 // core1 is only for UI (buttons, knobs, display)
 void setup1() {
-    delay(2000);
+    delay(5000);  // for debugging
 
     LittleFS.begin();
 
@@ -259,9 +265,11 @@ uint32_t encoder_push_millis;
 uint32_t step_push_millis;
 int step_push = -1;
 bool step_edited = false;
-char seq_meta[6]; // 5 chars + nul FIXME
+char seq_meta[11]; // 10 chars + nul FIXME
 
-// main UI loop
+//
+// --- main UI loop
+//
 void loop1()
 {
     // LEDS update
@@ -359,8 +367,11 @@ void loop1()
                 // do nothing
             }
             else {
+                if( now - step_push_millis > 1000 ) {
+                    strcpy(seq_meta, "saveseq");
+                }
                 if( seqr.playing ) {
-                    // do nothing, happens on release
+                    // mostly do nothing, happens on release
                 }
                 // UI: if not playing, step keys = play their notes
                 else {
@@ -374,7 +385,7 @@ void loop1()
                 // UI: encoder push + hold step key = save sequence
                 if( now - step_push_millis > 1000 ) {
                     sequence_save( step_push );
-                    strcpy(seq_meta, "saved");
+                    strcpy(seq_meta, "saved!");
                 }
                 // UI: encoder push + tap step key = load sequence
                 else {
@@ -407,9 +418,12 @@ void loop1()
 
 }
 
+//
 // --- sequence load / save functions
+//
 
 uint32_t last_sequence_write_millis = 0;
+
 // write all sequences to "disk"
 void sequences_write() {
     Serial.println("sequences_write");
@@ -442,42 +456,33 @@ void sequences_write() {
         Serial.println(F("sequences_write: Failed to write to file"));
     }
     file.close();
+    Serial.print("saved_sequences_json = \"");
     serializeJson(doc, Serial);
-    Serial.println("\nsequences saved");
+    Serial.println("\"\nsequences saved");
 }
 
 // read all sequences from "disk"
 void sequences_read() {
     Serial.println("sequences_read");
-
-    // File f = LittleFS.open( save_file, "r");
-    // String s = f.readStringUntil('\n');
-    // f.close();
-    // Serial.println("  contents:"); Serial.println(s);
+    DynamicJsonDocument doc(8192); // assistant said 6144
 
     File file = LittleFS.open( save_file, "r");
     if( !file ) {
-        Serial.println("sequences_read: no sequences file");
-        // make up some filler sequences
-        for( int j=0; j < numseqs; j++ ) {
-          for( int i=0; i< numsteps; i++ ) {
-            Step s;
-            s.note = 60 + random(-12,12);
-            s.vel  = 127;
-            s.gate = 10;
-            s.on   = true;
-            sequences[j][i] = s;
-          }
+        Serial.println("sequences_read: no sequences file. Using ROM default...");
+        DeserializationError error = deserializeJson(doc, default_saved_sequences_json);
+        if(error) {
+            Serial.print("sequences_read: deserialize default failed: ");
+            Serial.println(error.c_str());
+            return;
         }
-        return;
     }
-
-    DynamicJsonDocument doc(8192); // assistant said 6144
-    DeserializationError error = deserializeJson(doc, file); // inputLength);
-    if(error) {
-        Serial.print("sequences_read: deserialize failed: ");
-        Serial.println(error.c_str());
-        return;
+    else {
+        DeserializationError error = deserializeJson(doc, file); // inputLength);
+        if(error) {
+            Serial.print("sequences_read: deserialize failed: ");
+            Serial.println(error.c_str());
+            return;
+        }
     }
 
     for( int j=0; j < numseqs; j++ ) {
@@ -512,7 +517,9 @@ void sequence_save(int seq_num) {
     }
 }
 
+//
 // --- display details
+//
 
 //// {x,y} locations of screen items
 const int step_text_pos[] = { 0,15, 16,15, 32,15, 48,15,  64,15, 80,15, 96,15, 112,15 };

@@ -20,7 +20,7 @@ typedef enum {
     NONE,
     START,
     STOP,
-    RUN,
+    CLOCK,
 } clock_type_t;
 
 typedef void (*TriggerFunc)(uint8_t note, uint8_t vel, uint8_t gate, bool on);
@@ -95,9 +95,8 @@ public:
             if(send_clock) { clk_func( STOP, 0); }
         }
 
-        if( ticki == 0 ) { // do a step
-
-            // execute below only every ticks_per_step ticks
+        if( ticki == 0 ) {
+            // do a sequence step (i.e. every "ticks_per_step" ticks)
             if( ext_clock ) {
                 // do nothing, let midi clock trigger notes, but fall back to
                 // internal clock if not externally clocked for a while
@@ -106,17 +105,16 @@ public:
                     Serial.println("Turning EXT CLOCK off");
                 }
             }
-            else {
+            else {  // else internally clocked
                 trigger(now_micros, delta_t);
             }
-
         }
 
-        if( send_clock && playing ) {
-            clk_func( RUN, 0 );
+        if( send_clock && playing ) { // FIXME: && !ext_clock ?
+            clk_func( CLOCK, 0 );
         }
 
-        // increment our ticks-in-a-step counter: 0,1,2,3,4,5,0,1,2,3,4,5
+        // increment our ticks-per-step counter: 0,1,2,3,4,5, 0,1,2,3,4,5, ...
         ticki = (ticki + 1) % ticks_per_step;
     }
 
