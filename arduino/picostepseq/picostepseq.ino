@@ -40,13 +40,17 @@
 #include "fonts/helvnCB6pt7b.h"
 #include "fonts/ter_u12n7b.h" // CirPy's default displayio font, it seems
 
-#include "Sequencer.hpp"
+#include "Sequencer.h"
 
 #define myfont helvnCB6pt7b   // sigh
 #define myfont2 ter_u12n7b
 
-int midi_chan = 1;  // MIDI channel to send/receive on
+uint8_t midi_chan = 1;  // MIDI channel to send/receive on
 const char* save_file = "/saved_sequences.json";
+const bool send_midi_clock = true;
+const bool midi_debug = true;
+
+bool midi_uart_enable = true; // unused
 
 const int numseqs = 8;
 
@@ -91,78 +95,82 @@ StepSequencer seqr;
 
 Step sequences[numseqs][numsteps];
 
+uint8_t midiclk_cnt = 0;
+uint32_t midiclk_last_millis = 0; // FIXME: use micros()
 
 // callback used by Sequencer to trigger note on
 void play_note_on( uint8_t note, uint8_t vel, uint8_t gate, bool on ) {
-    Serial.printf("noteOn:  %d %d %d %d\n", note,vel,gate,on);
     if( on ) {
-        MIDIusb.sendNoteOn(note, vel, midi_chan); // 1?
-        MIDIserial.sendNoteOn(note, vel, midi_chan); // 1?
+        MIDIusb.sendNoteOn(note, vel, midi_chan);
+        MIDIserial.sendNoteOn(note, vel, midi_chan);
     }
+    if(midi_debug) { Serial.printf("noteOn:  %d %d %d %d\n", note,vel,gate,on); }
 }
 
 // callback used by Sequencer to trigger note off
 void play_note_off(uint8_t note, uint8_t vel, uint8_t gate, bool on ) {
-    Serial.printf("noteOff: %d %d %d %d\n", note,vel,gate,on);
-    // always send note off for now
     MIDIusb.sendNoteOff(note, vel, midi_chan);
     MIDIserial.sendNoteOff(note, vel, midi_chan);
+    if(midi_debug) { Serial.printf("noteOff: %d %d %d %d\n", note,vel,gate,on); }
+}
+// callback used by Sequencer to send midi clock
+void send_clock(clock_type_t type, int pos) {
+    (void)pos;  // not used yet
+    if( type == START ) {
+        MIDIusb.sendStart();
+        MIDIserial.sendStart();
+    }
+    else if( type == STOP) {
+        MIDIusb.sendStop();
+        MIDIserial.sendStop();
+    }
+    else if( type == RUN) {     // else RUN, send clock
+        MIDIusb.sendClock();
+        MIDIserial.sendClock();
+    }
+    if(midi_debug) { Serial.printf("clk:%d %d\n", type,pos); }
 }
 
-uint8_t midiclk_cnt = 0;
-uint32_t midiclk_last_millis = 0;
-
-void handle_midi_songpos(unsigned int beats) {
+void handle_midi_in_songpos(unsigned int beats) {
     Serial.printf("songpos:%d\n", beats);
     if( beats == 0 ) {
         seqr.stepi = 0;
     }
 }
-void handle_midi_start() {
-    seqr.ext_trigger = true;
+void handle_midi_in_start() {
     seqr.play();
-    Serial.println("start");
+    if(midi_debug) { Serial.println("midi in start"); }
     midiclk_cnt = 0;
 }
-void handle_midi_stop() {
+void handle_midi_in_stop() {
     seqr.stop();
-    Serial.println("stop");
+    if(midi_debug) { Serial.println("midi in stop"); }
 }
-void handle_midi_clock() {
-    // once every 1/16th note (24 pulses per quarter note => 6 pulses per 16th note)
-    if( midiclk_cnt % 6 == 0 ) {
+void handle_midi_in_clock() {
+    // once every 1/16th note (24 ticks (pulses) per quarter note => 6 pulses per 16th note)
+    if( midiclk_cnt % ticks_per_step == 0 ) {  // ticks_per_step = 6
         uint32_t now = millis();
         seqr.trigger_ext(now);
 
         // once every quarter note (just so we aggregate some time to minimize error)
-        if( midiclk_cnt % 24 == 0 ) {
-            uint32_t step_millis = (now - midiclk_last_millis) / 4;  // step_millis is 1/16th note time
+        if( midiclk_cnt % (ticks_per_step * steps_per_beat) == 0 ) {
+            uint32_t step_millis = (now - midiclk_last_millis) / steps_per_beat;
             midiclk_last_millis = now;
-            seqr.step_millis = step_millis;
+            //seqr.step_millis = step_millis;
+            seqr.tick_micros = step_millis * 1000;
             midiclk_cnt = 0;
         }
     }
     midiclk_cnt++;
 }
-void handle_midi_note_on_test(byte channel, byte note, byte velocity) {
-    Serial.printf("MIDI NOTE ON: %d %d %d\n", channel, note, velocity);
-}
+//void handle_midi_note_on_test(byte channel, byte note, byte velocity) {
+//    Serial.printf("MIDI NOTE ON: %d %d %d\n", channel, note, velocity);
+//}
 
-// core1 is only for MIDI in/output
-void setup1() { }
+////////////////////////////
 
-// core1 is only for MIDI in/out
-void loop1() {
-    MIDIusb.read();
-    MIDIserial.read();
-
-    seqr.update();  // will call play_note_{on,off} callbacks
-}
-
-//  core0 is UI (buttons, knobs, display)
+//  core0 is MIDI in/output
 void setup() {
-    LittleFS.begin();
-
     // USB and MIDI
     USBDevice.setManufacturerDescriptor("todbot");
     USBDevice.setProductDescriptor     ("PicoStepSeq");
@@ -170,23 +178,39 @@ void setup() {
     Serial1.setRX(midi_rx_pin);
     Serial1.setTX(midi_tx_pin);
 
-    MIDIusb.begin(MIDI_CHANNEL_OMNI);
-    MIDIserial.begin(MIDI_CHANNEL_OMNI);
+    MIDIusb.begin();
+    MIDIserial.begin();
 
     MIDIusb.turnThruOff();    // turn off echo
     MIDIserial.turnThruOff(); // turn off echo
 
-    MIDIusb.setHandleClock(handle_midi_clock);
-    MIDIusb.setHandleStart(handle_midi_start);
-    MIDIusb.setHandleStop(handle_midi_stop);
-    MIDIusb.setHandleSongPosition(handle_midi_songpos);
+    //MIDIusb.setHandleClock(handle_midi_in_clock);
+    //MIDIusb.setHandleStart(handle_midi_in_start);
+    //MIDIusb.setHandleStop(handle_midi_in_stop);
+    //MIDIusb.setHandleSongPosition(handle_midi_in_songpos);
 
-    MIDIserial.setHandleClock(handle_midi_clock);
-    MIDIserial.setHandleStart(handle_midi_start);
-    MIDIserial.setHandleStop(handle_midi_stop);
-    MIDIserial.setHandleSongPosition(handle_midi_songpos);
+    MIDIserial.setHandleClock(handle_midi_in_clock);
+    MIDIserial.setHandleStart(handle_midi_in_start);
+    MIDIserial.setHandleStop(handle_midi_in_stop);
+    MIDIserial.setHandleSongPosition(handle_midi_in_songpos);
 
-    MIDIserial.setHandleNoteOn(handle_midi_note_on_test);
+    //MIDIserial.setHandleNoteOn(handle_midi_note_on_test);
+
+}
+
+// core0 is only for MIDI in/out
+void loop() {
+    MIDIusb.read();
+    MIDIserial.read();
+    seqr.update();  // will call play_note_{on,off} callbacks
+    yield();
+}
+
+// core1 is only for UI (buttons, knobs, display)
+void setup1() {
+    delay(2000);
+
+    LittleFS.begin();
 
     sequences_read();
     sequence_load( seqr.seqno ); // 0
@@ -194,6 +218,8 @@ void setup() {
     seqr.set_tempo(tempo);
     seqr.on_func = play_note_on;
     seqr.off_func = play_note_off;
+    seqr.clk_func = send_clock;
+    seqr.send_clock = send_midi_clock;
 
     // KEYS
     for (uint8_t i=0; i< numsteps; i++) {
@@ -216,11 +242,6 @@ void setup() {
     encoder_switch.setPressedState(LOW);
 
     // DISPLAY
-    displaySetup();
-}
-
-void displaySetup() {
-    // DISPLAY
     Wire.setSDA( oled_sda_pin );
     Wire.setSCL( oled_scl_pin );
     Wire.begin();
@@ -239,10 +260,10 @@ uint32_t encoder_push_millis;
 uint32_t step_push_millis;
 int step_push = -1;
 bool step_edited = false;
-char seq_meta[6]; // 5 chars + nul
+char seq_meta[6]; // 5 chars + nul FIXME
 
 // main UI loop
-void loop()
+void loop1()
 {
     // LEDS update
     for( int i=0; i<numsteps; i++) {
@@ -317,6 +338,7 @@ void loop()
             // UI: encoder tap with no key == play/pause
             if( now - encoder_push_millis < 300 ) {
                 seqr.toggle_play_pause();
+                delay(10); // wait a bit for sequencer to change state
                 if( ! seqr.playing ) {
                     sequences_write();  // write to disk on pause
                 }
@@ -388,9 +410,16 @@ void loop()
 
 // --- sequence load / save functions
 
+uint32_t last_sequence_write_millis = 0;
 // write all sequences to "disk"
 void sequences_write() {
     Serial.println("sequences_write");
+    // save wear & tear on flash, only allow writes every 10 seconds
+    if( millis() - last_sequence_write_millis < 10*1000 ) { // only allow writes every 10 secs
+        Serial.println("sequences_write: too soon, wait a bit more");
+    }
+    last_sequence_write_millis = millis();
+
     DynamicJsonDocument doc(8192); // assistant said 6144
     for( int j=0; j < numseqs; j++ ) {
         JsonArray seq_array = doc.createNestedArray();
@@ -415,7 +444,7 @@ void sequences_write() {
     }
     file.close();
     serializeJson(doc, Serial);
-    Serial.println("sequences saved");
+    Serial.println("\nsequences saved");
 }
 
 // read all sequences from "disk"
