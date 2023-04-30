@@ -1,5 +1,6 @@
 /**
  * Sequencer.hpp -- Sequencer for picostepseq
+ * 28 Apr 2023 - @todbot / Tod Kurt
  * 15 Aug 2022 - @todbot / Tod Kurt
  * Part of https://github.com/todbot/picostepseq/
  */
@@ -8,12 +9,14 @@
 const int numsteps = 8;
 const int steps_per_beat = 4; // 16th note, beats are quarter notes, 120bpm = 120 quarter notes per min
 const int ticks_per_step = 6; // 24 ppq = 4 steps_per_beat * 6 ticks_per_step
+//const int ticks_per_quarternote = 24; // => ticks_per_step = ticks_per_quarternote / steps_per_beat
+
 
 typedef struct {
-    uint8_t note;
-    uint8_t vel;
-    uint8_t gate;
-    bool on;
+    uint8_t note; // midi note
+    uint8_t vel;  // midi velocity (always 127 currently)
+    uint8_t gate; // how long note should be on in 0-15 arbitrary units
+    bool on;      // does this note play or is or muted
 } Step;
 
 typedef enum {
@@ -24,7 +27,7 @@ typedef enum {
 } clock_type_t;
 
 typedef void (*TriggerFunc)(uint8_t note, uint8_t vel, uint8_t gate, bool on);
-typedef void (*ClockFunc)(clock_type_t type, int pos);
+typedef void (*ClockFunc)(clock_type_t type); // , int pos);
 
 class StepSequencer {
 public:
@@ -32,8 +35,8 @@ public:
     uint32_t tick_micros; // "micros_per_tick", microsecs per clock (6 clocks / step; 4 steps / quarternote)
     uint32_t last_tick_micros;
     uint32_t held_gate_millis;
-    uint8_t ticki;
-    uint8_t stepi;
+    uint8_t ticki; // which midi clock we're on
+    uint8_t stepi; // which sequencer step we're on
     int seqno;
     int transpose;
     bool playing;
@@ -83,16 +86,23 @@ public:
             off_func( held_note.note, held_note.vel, held_note.gate, held_note.on);
         }
 
-        // this is kind of a hack, maybe use rp2040 fifo?
+        // this is kind of a hack
         // handle communication from UI core to sequencer/MIDI core
         // translates 'playstate_change' to 'playing' and sending clocks
         if( playstate_change == START ) {
             playstate_change = NONE;
-            if(send_clock) { clk_func( START, 0 ); }
+            if(send_clock && !ext_clock) {
+                clk_func( START );
+            }
         }
         else if( playstate_change == STOP ) {
             playstate_change = NONE;
-            if(send_clock) { clk_func( STOP, 0); }
+            if(send_clock && !ext_clock) {
+                clk_func( STOP );
+            }
+        }
+        else if( send_clock && !ext_clock && playing ) {
+            clk_func( CLOCK );
         }
 
         if( ticki == 0 ) {
@@ -110,17 +120,13 @@ public:
             }
         }
 
-        if( send_clock && playing ) { // FIXME: && !ext_clock ?
-            clk_func( CLOCK, 0 );
-        }
-
         // increment our ticks-per-step counter: 0,1,2,3,4,5, 0,1,2,3,4,5, ...
         ticki = (ticki + 1) % ticks_per_step;
     }
 
     // Trigger next step in sequence (and make externally clocked)
     void trigger_ext(uint32_t now_micros) {
-        ext_clock = true;
+        //ext_clock = true;
         trigger(now_micros, 0); // FIXME: "0" was step_millis);
     }
 
@@ -132,11 +138,6 @@ public:
 
         Step s = steps[stepi];
         s.note += transpose;
-
-        // if( held_gate_millis )  { // just in case we have an old note hanging around
-        //    Serial.println("\nHELD NOTE\n");
-        //    off_func( held_note.note, held_note.vel, held_note.gate, held_note.on);
-        //}
 
         on_func(s.note, s.vel, s.gate, s.on);
 
@@ -160,18 +161,12 @@ public:
         playstate_change = START;
         last_tick_micros = micros() - tick_micros*2; // FIXME: hmmm
         playing = true;
-        //if( send_clock ) {
-        //    clk_func( START, 0);
-        //}
     }
 
     // signal to sequencer/MIDI core we want to stop/pause playing
     void pause() {
         playstate_change = STOP;
         playing = false;
-        //if( send_clock ) {
-        //    clk_func( STOP, 0);
-        //}
     }
 
     // signal to sequencer/MIDI core we want to stop playing
@@ -180,9 +175,6 @@ public:
         last_tick_micros = 0;
         playing = false;
         playstate_change = STOP;
-        //if( send_clock ) {
-        //    clk_func( STOP, 0);
-        //}
     }
 
 };

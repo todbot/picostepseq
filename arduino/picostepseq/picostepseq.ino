@@ -43,9 +43,8 @@ uint8_t midi_chan = 1;  // MIDI channel to send/receive on
 
 const char* save_file = "/saved_sequences.json";
 const bool send_midi_clock = true;
-const bool midi_debug = false;
-
-//bool midi_uart_enable = true; // unused
+const bool midi_out_debug = false;
+const bool midi_in_debug = true;
 
 const int numseqs = 8;
 
@@ -83,7 +82,7 @@ Adafruit_SSD1306 display(dw, dh, &Wire, -1);
 
 Adafruit_USBD_MIDI usb_midi;  // USB MIDI object
 MIDI_CREATE_INSTANCE(Adafruit_USBD_MIDI, usb_midi, MIDIusb); // USB MIDI
-MIDI_CREATE_INSTANCE(HardwareSerial, Serial1, MIDIserial);   // Serial MIDI
+MIDI_CREATE_INSTANCE(HardwareSerial, Serial1, MIDIuart);     // Serial MIDI
 
 float tempo = 100;
 StepSequencer seqr;
@@ -93,89 +92,122 @@ Step sequences[numseqs][numsteps];
 uint8_t midiclk_cnt = 0;
 uint32_t midiclk_last_millis = 0; // FIXME: use micros()
 
+//
+// -- MIDI sending & receiving functions
+//
+
 // callback used by Sequencer to trigger note on
-void play_note_on( uint8_t note, uint8_t vel, uint8_t gate, bool on ) {
+void send_note_on( uint8_t note, uint8_t vel, uint8_t gate, bool on ) {
     if( on ) {
         MIDIusb.sendNoteOn(note, vel, midi_chan);
-        MIDIserial.sendNoteOn(note, vel, midi_chan);
+        MIDIuart.sendNoteOn(note, vel, midi_chan);
     }
-    if(midi_debug) { Serial.printf("noteOn:  %d %d %d %d\n", note,vel,gate,on); }
+    if(midi_out_debug) { Serial.printf("noteOn:  %d %d %d %d\n", note,vel,gate,on); }
 }
 
 // callback used by Sequencer to trigger note off
-void play_note_off(uint8_t note, uint8_t vel, uint8_t gate, bool on ) {
-    MIDIusb.sendNoteOff(note, vel, midi_chan);
-    MIDIserial.sendNoteOff(note, vel, midi_chan);
-    if(midi_debug) { Serial.printf("noteOff: %d %d %d %d\n", note,vel,gate,on); }
+void send_note_off(uint8_t note, uint8_t vel, uint8_t gate, bool on ) {
+    if( on ) {
+        MIDIusb.sendNoteOff(note, vel, midi_chan);
+        MIDIuart.sendNoteOff(note, vel, midi_chan);
+    }
+    if(midi_out_debug) { Serial.printf("noteOff: %d %d %d %d\n", note,vel,gate,on); }
 }
-// callback used by Sequencer to send midi clock
-void send_clock(clock_type_t type, int pos) {
-    (void)pos;  // not used yet
+
+// callback used by Sequencer to send midi clock when internally triggered
+void send_clock_start_stop(clock_type_t type) {
     if( type == START ) {
         MIDIusb.sendStart();
-        MIDIserial.sendStart();
+        MIDIuart.sendStart();
     }
     else if( type == STOP ) {
         MIDIusb.sendStop();
-        MIDIserial.sendStop();
+        MIDIuart.sendStop();
     }
     else if( type == CLOCK ) {
         MIDIusb.sendClock();
-        MIDIserial.sendClock();
+        MIDIuart.sendClock();
     }
-    if(midi_debug) { Serial.printf("clk:%d %d\n", type,pos); }
+    if(midi_out_debug) { Serial.printf("clk:%d\n", type); }
 }
 
-void handle_midi_in_songpos(unsigned int beats) {
-    Serial.printf("songpos:%d\n", beats);
-    if( beats == 0 ) {
-        seqr.stepi = 0;
-    }
-}
+// void handle_midi_in_songpos(unsigned int beats) {
+//     Serial.printf("songpos:%d\n", beats);
+//     if( beats == 0 ) {
+//         seqr.stepi = 0;
+//     }
+// }
+
 void handle_midi_in_start() {
     seqr.play();
     midiclk_cnt = 0;
-    if(send_midi_clock) {
-        send_clock(START, 0);
-    }
-    if(midi_debug) { Serial.println("midi in start"); }
+    if(midi_in_debug) { Serial.println("midi in start"); }
 }
+
 void handle_midi_in_stop() {
     seqr.stop();
-    if(send_midi_clock) {
-        send_clock(STOP, 0);
-    }
-    if(midi_debug) { Serial.println("midi in stop"); }
+
+    if(midi_in_debug) { Serial.println("midi in stop"); }
 }
+void handle_active_sensing() {
+    Serial.printf("activesensing\n");
+}
+
+// FIXME: midi continue?
 void handle_midi_in_clock() {
-    if(send_midi_clock) {
-        send_clock(CLOCK, 0);
-    }
-    // once every 1/16th note (24 ticks (pulses) per quarter note => 6 pulses per 16th note)
+    seqr.ext_clock = true;
+    // once every ticks_per_step, play note (24 ticks per quarter note => 6 ticks per 16th note)
     if( midiclk_cnt % ticks_per_step == 0 ) {  // ticks_per_step = 6
         uint32_t now = millis();
-        seqr.trigger_ext(now);
+        seqr.trigger(now, 0);  // FIXME: figure out 2nd arg (was step_millis)
 
         // once every quarter note (just so we aggregate some time to minimize error)
         if( midiclk_cnt % (ticks_per_step * steps_per_beat) == 0 ) {
-            uint32_t step_millis = (now - midiclk_last_millis) / steps_per_beat;
+            uint32_t step_millis = (now - midiclk_last_millis) / (steps_per_beat*ticks_per_step);
             midiclk_last_millis = now;
-            //seqr.step_millis = step_millis;
-            seqr.tick_micros = step_millis * 1000;
+            seqr.tick_micros = step_millis * 1000;   //seqr.step_millis = step_millis;
             midiclk_cnt = 0;
         }
     }
     midiclk_cnt++;
 }
-//void handle_midi_note_on_test(byte channel, byte note, byte velocity) {
-//    Serial.printf("MIDI NOTE ON: %d %d %d\n", channel, note, velocity);
-//}
+
+//
+void midi_read_and_forward() {
+    if( MIDIusb.read() ) {
+        midi::MidiType t = MIDIusb.getType();
+        switch(t) {
+        case midi::Start:
+            handle_midi_in_start(); break;
+        case midi::Stop:
+            handle_midi_in_stop(); break;
+        case midi::Clock:
+            handle_midi_in_clock(); break;
+        default: break;
+        }
+        // forward the midi msg to other port
+        MIDIuart.send( t, MIDIusb.getData1(), MIDIusb.getData2(), MIDIusb.getChannel() );
+    }
+
+    if( MIDIuart.read() ) {
+        midi::MidiType t = MIDIuart.getType();
+        switch(t) {
+        case midi::Start:
+            handle_midi_in_start(); break;
+        case midi::Stop:
+            handle_midi_in_stop(); break;
+        case midi::Clock:
+            handle_midi_in_clock(); break;
+        default: break;
+        }
+        MIDIusb.send( t, MIDIuart.getData1(), MIDIuart.getData2(), MIDIuart.getChannel() );
+    }
+}
 
 ////////////////////////////
 
 //  core0 is MIDI in/output
 void setup() {
-    // USB and MIDI
     USBDevice.setManufacturerDescriptor("todbot");
     USBDevice.setProductDescriptor     ("PicoStepSeq");
 
@@ -183,31 +215,18 @@ void setup() {
     Serial1.setTX(midi_tx_pin);
 
     MIDIusb.begin();
-    MIDIserial.begin();
+    MIDIuart.begin();
 
     MIDIusb.turnThruOff();    // turn off echo
-    MIDIserial.turnThruOff(); // turn off echo
-
-    MIDIusb.setHandleClock(handle_midi_in_clock);
-    MIDIusb.setHandleStart(handle_midi_in_start);
-    MIDIusb.setHandleStop(handle_midi_in_stop);
-    MIDIusb.setHandleSongPosition(handle_midi_in_songpos);
-
-    MIDIserial.setHandleClock(handle_midi_in_clock);
-    MIDIserial.setHandleStart(handle_midi_in_start);
-    MIDIserial.setHandleStop(handle_midi_in_stop);
-    MIDIserial.setHandleSongPosition(handle_midi_in_songpos);
-
-    //MIDIserial.setHandleNoteOn(handle_midi_note_on_test);
+    MIDIuart.turnThruOff(); // turn off echo
 }
 
 //
 // --- core0 is only for MIDI in/out
 //
 void loop() {
-    MIDIusb.read();
-    MIDIserial.read();
-    seqr.update();  // will call play_note_{on,off} callbacks
+    midi_read_and_forward();
+    seqr.update();  // will call send_note_{on,off} callbacks
     yield();
 }
 
@@ -221,9 +240,9 @@ void setup1() {
     sequence_load( seqr.seqno ); // 0
 
     seqr.set_tempo(tempo);
-    seqr.on_func = play_note_on;
-    seqr.off_func = play_note_off;
-    seqr.clk_func = send_clock;
+    seqr.on_func = send_note_on;
+    seqr.off_func = send_note_off;
+    seqr.clk_func = send_clock_start_stop;
     seqr.send_clock = send_midi_clock;
 
     // KEYS
@@ -270,8 +289,7 @@ char seq_meta[11]; // 10 chars + nul FIXME
 //
 // --- main UI loop
 //
-void loop1()
-{
+void loop1() {
     // LEDS update
     for( int i=0; i<numsteps; i++) {
         Step s = seqr.steps[i];
@@ -313,11 +331,11 @@ void loop1()
         else if( step_push > -1 ) {
             Step s = seqr.steps[step_push];
             if( ! seqr.playing ) { // step preview note off
-                play_note_off( s.note, s.vel, s.gate, true);
+                send_note_off( s.note, s.vel, s.gate, true);
             }
             s.note = constrain( s.note + encoder_delta, 1,127);
             if( ! seqr.playing ) { // step preview note on
-                play_note_on( s.note, s.vel, s.gate, true);
+                send_note_on( s.note, s.vel, s.gate, true);
             }
             seqr.steps[step_push] = s;
             step_edited = true;
@@ -375,7 +393,7 @@ void loop1()
                 }
                 // UI: if not playing, step keys = play their notes
                 else {
-                    play_note_on( s.note, s.vel, s.gate, true );
+                    send_note_on( s.note, s.vel, s.gate, true );
                 }
             }
         }
@@ -404,7 +422,7 @@ void loop1()
                 }
                 // UI: paused: step keys = play step notes
                 else {
-                    play_note_off( s.note, s.vel, s.gate, true );
+                    send_note_off( s.note, s.vel, s.gate, true );
                 }
             }
             step_push_millis = 0;
@@ -415,8 +433,8 @@ void loop1()
 
     // DISPLAY update
     displayUpdate(step_push);
-
 }
+
 
 //
 // --- sequence load / save functions
