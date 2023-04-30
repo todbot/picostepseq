@@ -1,5 +1,5 @@
 /**
- * Sequencer.hpp -- Sequencer for picostepseq
+ * sequencer.h -- Sequencer for picostepseq
  * 28 Apr 2023 - @todbot / Tod Kurt
  * 15 Aug 2022 - @todbot / Tod Kurt
  * Part of https://github.com/todbot/picostepseq/
@@ -28,6 +28,9 @@ typedef enum {
 
 typedef void (*TriggerFunc)(uint8_t note, uint8_t vel, uint8_t gate, bool on);
 typedef void (*ClockFunc)(clock_type_t type); // , int pos);
+
+void fake_note_callback(uint8_t note, uint8_t vel, uint8_t gate, bool on) {  }
+void fake_clock_callback(clock_type_t type) { }
 
 class StepSequencer {
 public:
@@ -59,6 +62,9 @@ public:
         ext_clock = false;
         send_clock = false;
         set_tempo(atempo);
+        on_func = fake_note_callback;
+        off_func = fake_note_callback;
+        clk_func = fake_clock_callback;
     }
 
     // get tempo as floating point, computed dynamically from steps_millis
@@ -112,7 +118,7 @@ public:
                 // internal clock if not externally clocked for a while
                 if( delta_t > tick_micros * 1000 * 16 ) { // FIXME
                     ext_clock = false;
-                    Serial.println("Turning EXT CLOCK off");
+                    //Serial.println("Turning EXT CLOCK off");
                 }
             }
             else {  // else internally clocked
