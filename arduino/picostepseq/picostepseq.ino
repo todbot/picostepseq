@@ -39,11 +39,25 @@
 #define myfont helvnCB6pt7b  // sigh
 #define myfont2 ter_u12n7b
 
-uint8_t midi_chan = 1;  // MIDI channel to send/receive on
-bool send_midi_clock = true;
+typedef struct {
+  uint8_t midi_chan;
+  uint8_t midi_velocity;
+  bool midi_send_clock;
+  bool midi_forward_usb;
+  bool midi_forward_uart;
+} Config;
+
+Config cfg  = {
+  .midi_chan = 1,
+  .midi_velocity = 80,
+  .midi_send_clock = true,
+  .midi_forward_usb = true,
+  .midi_forward_uart = true,
+  .steps_per_beat = 4,
+};
 
 const char* save_file = "/saved_sequences.json";
-const bool midi_out_debug = true;
+const bool midi_out_debug = false;
 const bool midi_in_debug = true;
 
 const int numseqs = 8;
@@ -83,14 +97,14 @@ void checkEncoderPosition() {  encoder.tick();  } // call tick() to check the st
 int encoder_pos_last = 0;
 
 int led_vals[numsteps];
-int led_fade = 25;
+int led_fade = 35;
 
 float tempo = 100;
 StepSequencer seqr;
 Step sequences[numseqs][numsteps];
 
 uint8_t midiclk_cnt = 0;
-uint32_t midiclk_last_millis = 0;  // FIXME: use micros()
+uint32_t midiclk_last_micros = 0;
 
 //
 // -- MIDI sending & receiving functions
@@ -99,8 +113,8 @@ uint32_t midiclk_last_millis = 0;  // FIXME: use micros()
 // callback used by Sequencer to trigger note on
 void send_note_on(uint8_t note, uint8_t vel, uint8_t gate, bool on) {
   if (on) {
-    MIDIusb.sendNoteOn(note, vel, midi_chan);
-    MIDIuart.sendNoteOn(note, vel, midi_chan);
+    MIDIusb.sendNoteOn(note, vel, cfg.midi_chan);
+    MIDIuart.sendNoteOn(note, vel, cfg.midi_chan);
   }
   if (midi_out_debug) { Serial.printf("noteOn:  %d %d %d %d\n", note, vel, gate, on); }
 }
@@ -108,8 +122,8 @@ void send_note_on(uint8_t note, uint8_t vel, uint8_t gate, bool on) {
 // callback used by Sequencer to trigger note off
 void send_note_off(uint8_t note, uint8_t vel, uint8_t gate, bool on) {
   if (on) {
-    MIDIusb.sendNoteOff(note, vel, midi_chan);
-    MIDIuart.sendNoteOff(note, vel, midi_chan);
+    MIDIusb.sendNoteOff(note, vel, cfg.midi_chan);
+    MIDIuart.sendNoteOff(note, vel, cfg.midi_chan);
   }
   if (midi_out_debug) { Serial.printf("noteOff: %d %d %d %d\n", note, vel, gate, on); }
 }
@@ -156,15 +170,16 @@ void handle_midi_in_clock() {
   seqr.ext_clock = true;
   // once every ticks_per_step, play note (24 ticks per quarter note => 6 ticks per 16th note)
   if (midiclk_cnt % ticks_per_step == 0) {  // ticks_per_step = 6
-    uint32_t now = millis();
-    seqr.trigger(now, 0);  // FIXME: figure out 2nd arg (was step_millis)
+    uint32_t now_micros = micros();
+    seqr.trigger(now_micros, 0);  // FIXME: figure out 2nd arg (was step_millis)
 
     // once every quarter note (just so we aggregate some time to minimize error)
     if (midiclk_cnt % (ticks_per_step * steps_per_beat) == 0) {
-      uint32_t step_millis = (now - midiclk_last_millis) / (steps_per_beat * ticks_per_step);
-      midiclk_last_millis = now;
-      seqr.tick_micros = step_millis * 1000;  //seqr.step_millis = step_millis;
+      uint32_t step_micros = (now_micros - midiclk_last_micros) / (steps_per_beat * ticks_per_step);
+      midiclk_last_micros = now_micros;
+      seqr.tick_micros = step_micros;
       midiclk_cnt = 0;
+      Serial.printf("%ld %.2f\n", step_micros, step_micros/1000.0);
     }
   }
   midiclk_cnt++;
@@ -198,17 +213,15 @@ void midi_read_and_forward() {
         handle_midi_in_clock();  break;
       default: break;
     }
-    // byte d1 = MIDIuart.getData1();
-    // byte d2 = MIDIuart.getData2();
-    // byte ch = MIDIuart.getChannel();
-    // Serial.printf("uartin: %2x %2x %2x %d\n", t, d1, d2, ch);
     MIDIusb.send(t, MIDIuart.getData1(), MIDIuart.getData2(), MIDIuart.getChannel());
   }
 }
 
 ////////////////////////////
 
-//  core0 is MIDI in/output
+//
+// ---  MIDI in/out setup on core0
+//
 void setup() {
   USBDevice.setManufacturerDescriptor("todbot");
   USBDevice.setProductDescriptor("PicoStepSeq");
@@ -225,7 +238,7 @@ void setup() {
 }
 
 //
-// --- core0 is only for MIDI in/out
+// --- MIDI in/out on core0
 //
 void loop() {
   midi_read_and_forward();
@@ -233,7 +246,9 @@ void loop() {
   yield();
 }
 
-// core1 is only for UI (buttons, knobs, display)
+//
+// --- UI setup on core1 (buttons, knobs, display, LEDs)
+//
 void setup1() {
   // delay(5000);  // for debugging
 
@@ -243,10 +258,11 @@ void setup1() {
   sequence_load(seqr.seqno);  // 0
 
   seqr.set_tempo(tempo);
+  seqr.velocity = cfg.midi_velocity;
   seqr.on_func = send_note_on;
   seqr.off_func = send_note_off;
   seqr.clk_func = send_clock_start_stop;
-  seqr.send_clock = send_midi_clock;
+  seqr.send_clock = cfg.midi_send_clock;
 
   // KEYS
   for (uint8_t i = 0; i < numsteps; i++) {
@@ -257,7 +273,7 @@ void setup1() {
   // LEDS
   for (uint8_t i = 0; i < numsteps; i++) {
     pinMode(led_pins[i], OUTPUT);
-    analogWrite(led_pins[i], i * 31);  // just to test
+    analogWrite(led_pins[i], i * 10);  // just to test
   }
 
   // ENCODER
@@ -275,23 +291,47 @@ void setup1() {
 
   if (!display.begin(SSD1306_SWITCHCAPVCC, oled_i2c_addr)) {
     Serial.println(F("SSD1306 allocation failed"));
-    for (;;)
-      ;  // Don't proceed, loop forever
+    for (;;) ;  // Don't proceed, loop forever
   }
-  display.clearDisplay();
-  display.display();  // must clear before display, otherwise shows adafruit logo
+
+  displaySplash();
+  displayConfig();
+  delay(1000);
 }
 
 // variables for UI state management
 int encoder_delta = 0;
 uint32_t encoder_push_millis;
 uint32_t step_push_millis;
+//bool steps_pushed[numsteps]; // which keys are pressed
 int step_push = -1;
 bool step_edited = false;
-char seq_meta[11];  // 10 chars + nul FIXME
+char seq_info[11];  // 10 chars + nul FIXME
+bool display_mode = 0;
+
+/**
+ * Let's talk about UI input "verbs"
+ *
+ * encoder tap                -- play/stop
+ * encoder pushhold           -- modifier for combo
+ * encoder turn               -- transpose
+ * encoder pushhold + turn    -- bpm
+ *
+ * key tap                    -- mute/unmute or play step
+ * key hold                   -- modifier for combo ()
+ *
+ * key hold + encoder turn
+ * key hold + encoder tap  (unused)
+ * key hold + encoder pushhold + encoder turn
+ *
+ * encoder hold + key tap
+ * encoder hold + key hold
+ * encoder hold + key hold + encoder turn (currently unused)
+ *
+ */
 
 //
-// --- main UI loop
+// --- UI handling on core1
 //
 void loop1() {
   // LEDS update
@@ -318,9 +358,14 @@ void loop1() {
 
   uint32_t now = millis();
 
-  if (encoder_push_millis > 0 && step_push_millis > 0) {
-    if (encoder_push_millis < step_push_millis) {  // encoder pushed first
-                                                   //Serial.println("SAVE sequence");
+  if (encoder_push_millis > 0 ) {
+    if (!step_push_millis && (now-encoder_push_millis) > 1000 ) { // encoder push only > 1sec
+      display_mode =  (display_mode + 1) % 2; // FIXME: flickers between screens
+    }
+    if (step_push_millis > 0) {
+      if (encoder_push_millis < step_push_millis) {  // encoder pushed first
+        strcpy(seq_info, "saveseq");
+      }
     }
   }
 
@@ -379,37 +424,39 @@ void loop1() {
     encoder_push_millis = 0;  // we own it, and we're done with it
   }
 
+
   // KEYS update
+  // held check
+  // for(uint8_t i=0; i< numsteps; i++) {
+  //   if( keys[i].isPressed() && step_push_millis > 1000 && encoder_push_millis > 0 ) {
+  //     strcpy(seq_info, "saveseq");
+  //   }
+  // }
+
+  // event check
   for (uint8_t i = 0; i < numsteps; i++) {
     keys[i].update();
-    Step s = seqr.steps[i];  // FIXME: is this ia copy?
+    Step s = seqr.steps[i];
 
-    if (keys[i].pressed()) {  // press
+    if (keys[i].pressed()) {  // press event
       step_push = i;
       step_push_millis = now;
 
-      if (encoder_push_millis > 0) {
+      if (encoder_push_millis > 0) { // not pushing encoder
         // do nothing
       } else {
-        if (now - step_push_millis > 1000) {
-          strcpy(seq_meta, "saveseq");
-        }
-        if (seqr.playing) {
-          // mostly do nothing, happens on release
-        }
-        // UI: if not playing, step keys = play their notes
-        else {
+        if (!seqr.playing) {
           send_note_on(s.note, s.vel, s.gate, true);
         }
       }
     }
 
-    else if (keys[i].released()) {    // release
+    else if (keys[i].released()) {    // release event
       if (encoder_push_millis > 0) {  // UI: load/save sequence mode
         // UI: encoder push + hold step key = save sequence
         if (now - step_push_millis > 1000) {
           sequence_save(step_push);
-          strcpy(seq_meta, "saved!");
+          strcpy(seq_info, "");
         }
         // UI: encoder push + tap step key = load sequence
         else {
@@ -436,7 +483,13 @@ void loop1() {
   }
 
   // DISPLAY update
-  displayUpdate(step_push);
+  if (display_mode == 1) {
+    displayConfig();
+  }
+  else {
+    displayUpdate(step_push);
+  }
+
 }
 
 
@@ -542,44 +595,33 @@ void sequence_save(int seq_num) {
 //
 // --- display details
 //
+typedef struct { int x; int y; int vx; int vy; const char* str;} pos_t;
 
 //// {x,y} locations of play screen items
 const int step_text_pos[] = { 0, 15, 16, 15, 32, 15, 48, 15, 64, 15, 80, 15, 96, 15, 112, 15 };
-const int bpm_text_pos[] = { 0, 57 };
-const int bpm_val_pos[] = { 25, 57 };
-const int trans_text_pos[] = { 55, 57 };
-const int seqno_text_pos[] = { 0, 45 };
-const int seq_meta_pos[] = { 60, 45 };
-const int play_text_pos[] = { 110, 57 };
-const int oct_text_offset[] = { 3, 10 };
-const int gate_bar_offset[] = { 0, -15 };
+const pos_t bpm_text_pos    = {.x=0,  .y=57, .vx=0, .vy=0, .str="bpm:%3d" };
+const pos_t trans_text_pos  = {.x=55, .y=57, .vx=0, .vy=0, .str="trs:%+2d" };
+const pos_t seqno_text_pos  = {.x=0,  .y=45, .vx=0, .vy=0, .str="seq:%d" };
+const pos_t seq_info_pos    = {.x=60, .y=45 };
+const pos_t play_text_pos   = {.x=110,.y=57 };
+
+const pos_t oct_text_offset = { .x=3, .y=10 };
+const pos_t gate_bar_offset = { .x=0, .y=-15 };
+const pos_t edit_text_offset= { .x=3, .y=22 };
 const int gate_bar_width = 14;
 const int gate_bar_height = 4;
-const int edit_text_offset[] = { 3, 22 };
 
 // {x,y} locations of config screen
-const int midi_chan_text_pos[] = { 0, 57 };
-const int midi_chan_val_pos[] = { 25, 57 };
+const pos_t midichan_text_pos  = {.x=0, .y=30, .vx=80, .vy = 30, "midi ch:" };
+const pos_t midiclock_text_pos = {.x=0, .y=50, .vx=80, .vy = 50, "midi clk:" };
 
 const char* note_strs[] = { "C ", "C#", "D ", "D# ", "E ", "F ", "F#", "G ", "G#", "A ", "A#", "B ", "C " };
 
 int notenum_to_oct(int notenum) {
   return (notenum / 12) - 2;
 }
-
 const char* notenum_to_notestr(int notenum) {
   return note_strs[notenum % 12];
-}
-
-void displayConfig() {
-  display.clearDisplay();
-  display.setFont(&myfont2);
-
-  // midi_chan
-  display.setCursor(midi_chan_text_pos[0], midi_chan_text_pos[1]);
-  display.print("midi chan:");
-  display.setCursor(midi_chan_val_pos[0], midi_chan_val_pos[1]);
-  display.printf("%3d", midi_chan);
 }
 
 void displayUpdate(int selected_step) {
@@ -593,40 +635,72 @@ void displayUpdate(int selected_step) {
     int x = step_text_pos[i * 2], y = step_text_pos[i * 2 + 1];
     display.setCursor(x, y);
     display.print(nstr);
-    display.setCursor(x + oct_text_offset[0], y + oct_text_offset[1]);
+    display.setCursor(x + oct_text_offset.x, y + oct_text_offset.y);
     display.printf("%1d", o);
-    display.setCursor(x + edit_text_offset[0], y + edit_text_offset[1]);
+    display.setCursor(x + edit_text_offset.x, y + edit_text_offset.y);
     display.print((i == selected_step) ? '^' : (s.on) ? ' '
                                                       : '*');
     int gate_w = 1 + (s.gate * gate_bar_width / 16);
-    display.fillRect(x + gate_bar_offset[0], y + gate_bar_offset[1], gate_w, gate_bar_height, WHITE);
+    display.fillRect(x + gate_bar_offset.x, y + gate_bar_offset.y, gate_w, gate_bar_height, WHITE);
   }
 
   display.setFont(&myfont2);
 
   // bpm
-  display.setCursor(bpm_text_pos[0], bpm_text_pos[1]);
-  display.print("bpm:");
-  //display.printf("bpm:%3d", (int)(seqr.tempo()) );
-  display.setCursor(bpm_val_pos[0], bpm_val_pos[1]);
-  display.printf("%3d", (int)(seqr.tempo()));
+  display.setCursor(bpm_text_pos.x, bpm_text_pos.y);
+  display.printf(bpm_text_pos.str, (int)(seqr.tempo()));
 
-  // trans
-  display.setCursor(trans_text_pos[0], trans_text_pos[1]);
-  display.printf("trs:%+2d", seqr.transpose);
+  // transpose
+  display.setCursor(trans_text_pos.x, trans_text_pos.y);
+  display.printf(trans_text_pos.str, seqr.transpose);
 
   // seqno
-  display.setCursor(seqno_text_pos[0], seqno_text_pos[1]);
-  display.printf("seq:%d", seqr.seqno + 1);  // user sees 1-8
+  display.setCursor(seqno_text_pos.x, seqno_text_pos.y);
+  display.printf(seqno_text_pos.str, seqr.seqno + 1);  // user sees 1-8
 
-  // seq meta
-  display.setCursor(seq_meta_pos[0], seq_meta_pos[1]);
-  display.print(seq_meta);  // FIXME: this is onscren too briefly and what does CirPy version do?
-  strcpy(seq_meta, "     ");
+  // seq info / meta
+  display.setCursor(seq_info_pos.x, seq_info_pos.y);
+  display.print(seq_info);
 
   // play/pause
-  display.setCursor(play_text_pos[0], play_text_pos[1]);
+  display.setCursor(play_text_pos.x, play_text_pos.y);
   display.print(seqr.playing ? " >" : "[]");
 
   display.display();
+}
+
+void displayConfig() {
+  display.clearDisplay();
+  display.setFont(&myfont2);
+  display.setTextColor(WHITE, 0);
+
+  display.setCursor( midichan_text_pos.x, midichan_text_pos.y);
+  display.print(midichan_text_pos.str);
+  display.setCursor( midichan_text_pos.vx, midichan_text_pos.vy);
+  display.printf("%d", cfg.midi_chan);
+
+  display.setCursor( midiclock_text_pos.x, midiclock_text_pos.y);
+  display.print(midiclock_text_pos.str);
+  display.setCursor( midiclock_text_pos.vx, midiclock_text_pos.vy);
+  display.printf("%s", cfg.midi_send_clock ? "on":"off");
+
+  display.display();
+}
+
+void displaySplash() {
+  display.clearDisplay();
+  display.setFont(&myfont2);
+  display.setTextColor(WHITE, 0);
+  display.drawRect(0,0, dw-1, dh-1, WHITE);
+  display.setCursor(30, 32);
+  display.print("PICOSTEPSEQ");
+  display.display();
+  // a little LED dance
+  for( int i=0; i<1000; i++) {
+    for( int j=0; j<numsteps; j++) {
+      int v = 30 + 30 * sin( (j*6.2 / 8 ) + i/50.0 ) ;
+      analogWrite( led_pins[j], v);
+    }
+    delay(1);
+  }
 }
