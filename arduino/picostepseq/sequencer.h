@@ -40,7 +40,7 @@ class StepSequencer {
 public:
 
     uint32_t tick_micros; // "micros_per_tick", microsecs per clock (6 clocks / step; 4 steps / quarternote)
-    uint32_t last_tick_micros;
+    uint32_t last_tick_micros; // only change in update()
     uint32_t held_gate_millis;
     int ticks_per_step;  // expected values: 6 = 1/16th, 12 = 1/8, 24 = 1/4,
     int ticki; // which midi clock we're on
@@ -57,7 +57,6 @@ public:
     Step held_note;
     Step steps[numsteps];
     uint8_t velocity;   // if set, velocity to use instead of saved
-    int tst1;
 
     StepSequencer( float atempo=120, uint8_t aseqno=0 ) {
         transpose = 0;
@@ -89,16 +88,15 @@ public:
 
     void update() {
         uint32_t now_micros = micros();
-        uint32_t delta_t = now_micros - last_tick_micros;
-        tst1++;
-        if( delta_t < tick_micros ) { return; }  // not yet
+        if( (now_micros - last_tick_micros) < tick_micros ) { return; }  // not yet
         last_tick_micros = now_micros;
 
         // // serious debug cruft here
-        // Serial.printf("up:%2d %d  %6ld %6ld  dt:%6ld t:%6ld last:%6ld %d\n",
+        // Serial.printf("up:%2d %d  %6ld %6ld  dt:%6ld t:%6ld last:%6ld\n",
         //               ticki, playing,  held_gate_millis, millis(),
-        //               delta_t, tick_micros, last_tick_micros, tst1 );
-        // tst1=0;
+        //               delta_t, tick_micros, last_tick_micros );
+        //Serial.printf("up: %ld \t h:%2x/%2x/%1x/%d\n", held_gate_millis,
+        //              held_note.note, held_note.vel, held_note.gate, held_note.on);
 
         // if we have a held note and it's time to turn it off, turn it off
         if( held_gate_millis != 0 && millis() >= held_gate_millis ) {
@@ -115,13 +113,13 @@ public:
             if( extclk_micros ) {
                 // do nothing, let midi clock trigger notes, but fall back to
                 // internal clock if not externally clocked for a while
-                if( now_micros - extclk_micros > tick_micros * ticks_per_quarternote ) {
+                if( (now_micros - extclk_micros) > tick_micros * ticks_per_quarternote ) {
                     extclk_micros = 0;
                     Serial.println("Turning EXT CLOCK off");
                 }
             }
             else {  // else internally clocked
-                trigger(now_micros, delta_t);
+              trigger(now_micros, 0); // delta_t);
             }
         }
 
@@ -132,7 +130,6 @@ public:
     // Trigger step when externally clocked (turns on external clock flag)
     void trigger_ext(uint32_t now_micros) {
         extclk_micros = now_micros;
-        //last_tick_micros = now_micros;
         trigger(now_micros,0);
     }
 
@@ -166,8 +163,6 @@ public:
     void play() {
         stepi = -1; // hmm, but goes to 0 on first downbeat
         ticki = 0;
-        //playstate_change = START;
-        last_tick_micros = micros() - tick_micros; // FIXME: hmmm
         playing = true;
         if(send_clock && !extclk_micros) {
           clk_func( START );
@@ -176,7 +171,6 @@ public:
 
     // signal to sequencer/MIDI core we want to stop/pause playing
     void pause() {
-        //playstate_change = STOP;
         playing = false;
     }
 
@@ -184,33 +178,9 @@ public:
     void stop() {
         playing = false;
         stepi = -1;
-        //last_tick_micros = ;
-        //playstate_change = STOP;
         if(send_clock && !extclk_micros) {
           clk_func( STOP );
         }
     }
 
 };
-
-
-// clock_type_t playstate_change;
-
-        // // this is kind of a hack
-        // // handle communication from UI core to sequencer/MIDI core
-        // // translates 'playstate_change' to 'playing' and sending clocks
-        // if( playstate_change == START ) {
-        //     playstate_change = NONE;
-        //     if(send_clock && !ext_clock) {
-        //         clk_func( START );
-        //     }
-        // }
-        // else if( playstate_change == STOP ) {
-        //     playstate_change = NONE;
-        //     if(send_clock && !ext_clock) {
-        //         clk_func( STOP );
-        //     }
-        // }
-        // else if( send_clock && !ext_clock && playing ) {
-        //     clk_func( CLOCK );
-        // }
