@@ -40,6 +40,7 @@
 #define myfont2 ter_u12n7b
 
 typedef struct {
+  uint8_t step_size;  // aka "seqr.ticks_per_step"
   uint8_t midi_chan;
   uint8_t midi_velocity;
   bool midi_send_clock;
@@ -48,16 +49,17 @@ typedef struct {
 } Config;
 
 Config cfg  = {
+  //.step_size = SIXTEENTH_NOTE,
+  .step_size = EIGHTH_NOTE,
   .midi_chan = 1,
   .midi_velocity = 80,
   .midi_send_clock = true,
   .midi_forward_usb = true,
   .midi_forward_uart = true,
-  .steps_per_beat = 4,
 };
 
 const char* save_file = "/saved_sequences.json";
-const bool midi_out_debug = false;
+const bool midi_out_debug = true;
 const bool midi_in_debug = true;
 
 const int numseqs = 8;
@@ -97,7 +99,7 @@ void checkEncoderPosition() {  encoder.tick();  } // call tick() to check the st
 int encoder_pos_last = 0;
 
 int led_vals[numsteps];
-int led_fade = 35;
+int led_fade = 85;
 
 float tempo = 100;
 StepSequencer seqr;
@@ -140,7 +142,7 @@ void send_clock_start_stop(clock_type_t type) {
     MIDIusb.sendClock();
     MIDIuart.sendClock();
   }
-  if (midi_out_debug) { Serial.printf("clk:%d\n", type); }
+  //if (midi_out_debug) { Serial.printf("\tclk:%d\n", type); }
 }
 
 // void handle_midi_in_songpos(unsigned int beats) {
@@ -158,31 +160,27 @@ void handle_midi_in_start() {
 
 void handle_midi_in_stop() {
   seqr.stop();
-
   if (midi_in_debug) { Serial.println("midi in stop"); }
-}
-void handle_active_sensing() {
-  Serial.printf("activesensing\n");
 }
 
 // FIXME: midi continue?
 void handle_midi_in_clock() {
-  seqr.ext_clock = true;
+  uint32_t now_micros = micros();
+  //const int fscale = 230; // out of 255, 230/256 = .9 filter
   // once every ticks_per_step, play note (24 ticks per quarter note => 6 ticks per 16th note)
-  if (midiclk_cnt % ticks_per_step == 0) {  // ticks_per_step = 6
-    uint32_t now_micros = micros();
-    seqr.trigger(now_micros, 0);  // FIXME: figure out 2nd arg (was step_millis)
-
-    // once every quarter note (just so we aggregate some time to minimize error)
-    if (midiclk_cnt % (ticks_per_step * steps_per_beat) == 0) {
-      uint32_t step_micros = (now_micros - midiclk_last_micros) / (steps_per_beat * ticks_per_step);
-      midiclk_last_micros = now_micros;
-      seqr.tick_micros = step_micros;
-      midiclk_cnt = 0;
-      Serial.printf("%ld %.2f\n", step_micros, step_micros/1000.0);
-    }
+  if (midiclk_cnt % seqr.ticks_per_step == 0) {  // ticks_per_step = 6 for 16th note
+    seqr.trigger_ext(now_micros);  // FIXME: figure out 2nd arg (was step_millis)
   }
   midiclk_cnt++;
+  // once every quarter note, calculate new BPM, but be a little cautious about it
+  if( midiclk_cnt == ticks_per_quarternote ) {
+      uint32_t new_tick_micros = (now_micros - midiclk_last_micros) / ticks_per_quarternote;
+      if( new_tick_micros > seqr.tick_micros/2 && new_tick_micros < seqr.tick_micros*2 ) {
+        seqr.tick_micros = new_tick_micros;
+      }
+      midiclk_last_micros = now_micros;
+      midiclk_cnt = 0;
+  }
 }
 
 //
@@ -243,7 +241,6 @@ void setup() {
 void loop() {
   midi_read_and_forward();
   seqr.update();  // will call send_note_{on,off} callbacks
-  yield();
 }
 
 //
@@ -258,6 +255,7 @@ void setup1() {
   sequence_load(seqr.seqno);  // 0
 
   seqr.set_tempo(tempo);
+  seqr.ticks_per_step = cfg.step_size;
   seqr.velocity = cfg.midi_velocity;
   seqr.on_func = send_note_on;
   seqr.off_func = send_note_off;
@@ -310,7 +308,7 @@ char seq_info[11];  // 10 chars + nul FIXME
 bool display_mode = 0;
 
 /**
- * Let's talk about UI input "verbs"
+ * Let's talk about UI input "verbs".  This is what we got:
  *
  * encoder tap                -- play/stop
  * encoder pushhold           -- modifier for combo
@@ -338,7 +336,8 @@ void loop1() {
   for (int i = 0; i < numsteps; i++) {
     Step s = seqr.steps[i];
     int v = 0;                         // UI: off = muted
-    if (i == seqr.stepi) { v = 255; }  // UI: bright red = indicates sequence postion
+    int si = (seqr.stepi-0) % numsteps;
+    if (i == si) { v = 255; }  // UI: bright red = indicates sequence postion
     else if (s.on) {
       v = 40;
     }                                    // UI: dim red = indicates mute/unmute state
@@ -360,7 +359,7 @@ void loop1() {
 
   if (encoder_push_millis > 0 ) {
     if (!step_push_millis && (now-encoder_push_millis) > 1000 ) { // encoder push only > 1sec
-      display_mode =  (display_mode + 1) % 2; // FIXME: flickers between screens
+      //display_mode =  (display_mode + 1) % 2; // FIXME: flickers between screens
     }
     if (step_push_millis > 0) {
       if (encoder_push_millis < step_push_millis) {  // encoder pushed first
@@ -414,7 +413,7 @@ void loop1() {
     if (step_push == -1 && encoder_delta == 0) {  // step key is not pressed and no encoder turn
       // UI: encoder tap with no key == play/pause
       if (now - encoder_push_millis < 300) {
-        seqr.toggle_play_pause();
+        seqr.toggle_play_stop();
         delay(10);  // wait a bit for sequencer to change state
         if (!seqr.playing) {
           sequences_write();  // write to disk on pause
@@ -612,6 +611,7 @@ const int gate_bar_width = 14;
 const int gate_bar_height = 4;
 
 // {x,y} locations of config screen
+const pos_t stepsize_text_pos  = {.x=0, .y=10, .vx=80, .vy = 10, "step size:" };
 const pos_t midichan_text_pos  = {.x=0, .y=30, .vx=80, .vy = 30, "midi ch:" };
 const pos_t midiclock_text_pos = {.x=0, .y=50, .vx=80, .vy = 50, "midi clk:" };
 
@@ -673,6 +673,11 @@ void displayConfig() {
   display.clearDisplay();
   display.setFont(&myfont2);
   display.setTextColor(WHITE, 0);
+
+  display.setCursor( stepsize_text_pos.x, stepsize_text_pos.y);
+  display.print(stepsize_text_pos.str);
+  display.setCursor( stepsize_text_pos.vx, stepsize_text_pos.vy);
+  display.printf("%d", cfg.step_size);
 
   display.setCursor( midichan_text_pos.x, midichan_text_pos.y);
   display.print(midichan_text_pos.str);

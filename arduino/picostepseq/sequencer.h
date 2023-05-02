@@ -7,10 +7,8 @@
 
 
 const int numsteps = 8;
-const int steps_per_beat = 4; // 16th note, beats are quarter notes, 120bpm = 120 quarter notes per min
-const int ticks_per_step = 6; // 24 ppq = 4 steps_per_beat * 6 ticks_per_step
-//const int ticks_per_quarternote = 24; // => ticks_per_step = ticks_per_quarternote / steps_per_beat
-
+const int ticks_per_quarternote = 24; // 24 ppq per midi std
+const int steps_per_beat_default = 4;
 
 typedef struct {
     uint8_t note; // midi note
@@ -26,6 +24,12 @@ typedef enum {
     CLOCK,
 } clock_type_t;
 
+typedef enum {
+  QUARTER_NOTE = 24,
+  EIGHTH_NOTE = 12,
+  SIXTEENTH_NOTE = 6,
+} valid_ticks_per_step;
+
 typedef void (*TriggerFunc)(uint8_t note, uint8_t vel, uint8_t gate, bool on);
 typedef void (*ClockFunc)(clock_type_t type); // , int pos);
 
@@ -38,53 +42,63 @@ public:
     uint32_t tick_micros; // "micros_per_tick", microsecs per clock (6 clocks / step; 4 steps / quarternote)
     uint32_t last_tick_micros;
     uint32_t held_gate_millis;
-    uint8_t ticki; // which midi clock we're on
-    uint8_t stepi; // which sequencer step we're on
+    int ticks_per_step;  // expected values: 6 = 1/16th, 12 = 1/8, 24 = 1/4,
+    int ticki; // which midi clock we're on
+    int stepi; // which sequencer step we're on
     int seqno;
     int transpose;
     bool playing;
-    clock_type_t playstate_change;
-    bool ext_clock;
+  //bool ext_clock;
     bool send_clock;
+    uint32_t extclk_micros; // 0 = internal clock, non-zero = external clock
     TriggerFunc on_func;
     TriggerFunc off_func;
     ClockFunc clk_func;
     Step held_note;
     Step steps[numsteps];
+    uint8_t velocity;   // if set, velocity to use instead of saved
+    int tst1;
 
     StepSequencer( float atempo=120, uint8_t aseqno=0 ) {
         transpose = 0;
         last_tick_micros = 0;
         stepi = 0;
         ticki = 0;
+        ticks_per_step = 6; // 6 = 1/16th, 12 = 1/8, 24 = 1/4,
         seqno = aseqno;
         playing = false;
-        ext_clock = false;
+        //ext_clock = false;
+        extclk_micros = 0;
         send_clock = false;
+        velocity = 0;
         set_tempo(atempo);
         on_func = fake_note_callback;
         off_func = fake_note_callback;
         clk_func = fake_clock_callback;
     }
 
-    // get tempo as floating point, computed dynamically from steps_millis
+    // get tempo as floating point, computed dynamically from ticks_micros
     float tempo() {
-        //return 60 * 1000 / step_millis / steps_per_beat ;
-        return 60 * 1000 * 1000 / tick_micros / (steps_per_beat * ticks_per_step);
+        return 60 * 1000 * 1000 / tick_micros / ticks_per_quarternote; //steps_per_beat * ticks_per_step);
     }
 
-    // set tempo as floating point, computes steps_millis
+    // set tempo as floating point, computes ticks_micros
     void set_tempo(float bpm) {
-        //step_millis = (60 * 1000) / steps_per_beat / bpm;
-        tick_micros = 60 * 1000 * 1000 / bpm / (steps_per_beat*ticks_per_step) ; // 24 ppq
+        tick_micros = 60 * 1000 * 1000 / bpm / ticks_per_quarternote;
     }
 
     void update() {
         uint32_t now_micros = micros();
-        uint16_t delta_t = now_micros - last_tick_micros;
+        uint32_t delta_t = now_micros - last_tick_micros;
+        tst1++;
         if( delta_t < tick_micros ) { return; }  // not yet
         last_tick_micros = now_micros;
-        //int16_t ddt = delta_t - tick_micros; // typically ranges 0-8, we are good
+
+        // // serious debug cruft here
+        // Serial.printf("up:%2d %d  %6ld %6ld  dt:%6ld t:%6ld last:%6ld %d\n",
+        //               ticki, playing,  held_gate_millis, millis(),
+        //               delta_t, tick_micros, last_tick_micros, tst1 );
+        // tst1=0;
 
         // if we have a held note and it's time to turn it off, turn it off
         if( held_gate_millis != 0 && millis() >= held_gate_millis ) {
@@ -92,33 +106,18 @@ public:
             off_func( held_note.note, held_note.vel, held_note.gate, held_note.on);
         }
 
-        // this is kind of a hack
-        // handle communication from UI core to sequencer/MIDI core
-        // translates 'playstate_change' to 'playing' and sending clocks
-        if( playstate_change == START ) {
-            playstate_change = NONE;
-            if(send_clock && !ext_clock) {
-                clk_func( START );
-            }
-        }
-        else if( playstate_change == STOP ) {
-            playstate_change = NONE;
-            if(send_clock && !ext_clock) {
-                clk_func( STOP );
-            }
-        }
-        else if( send_clock && !ext_clock && playing ) {
+        if( send_clock && playing && !extclk_micros ) {
             clk_func( CLOCK );
         }
 
         if( ticki == 0 ) {
             // do a sequence step (i.e. every "ticks_per_step" ticks)
-            if( ext_clock ) {
+            if( extclk_micros ) {
                 // do nothing, let midi clock trigger notes, but fall back to
                 // internal clock if not externally clocked for a while
-                if( delta_t > tick_micros * 1000 * 16 ) { // FIXME
-                    ext_clock = false;
-                    //Serial.println("Turning EXT CLOCK off");
+                if( now_micros - extclk_micros > tick_micros * ticks_per_quarternote ) {
+                    extclk_micros = 0;
+                    Serial.println("Turning EXT CLOCK off");
                 }
             }
             else {  // else internally clocked
@@ -130,10 +129,11 @@ public:
         ticki = (ticki + 1) % ticks_per_step;
     }
 
-    // Trigger next step in sequence (and make externally clocked)
+    // Trigger step when externally clocked (turns on external clock flag)
     void trigger_ext(uint32_t now_micros) {
-        //ext_clock = true;
-        trigger(now_micros, 0); // FIXME: "0" was step_millis);
+        extclk_micros = now_micros;
+        //last_tick_micros = now_micros;
+        trigger(now_micros,0);
     }
 
     // Trigger step in sequence, when internally clocked
@@ -142,45 +142,75 @@ public:
         if( !playing ) { return; }
         (void)delta_t; // silence unused variable
 
+        stepi = (stepi + 1) % numsteps; // go to next step
+
         Step s = steps[stepi];
         s.note += transpose;
+        s.vel = (velocity) ? velocity : s.vel;
 
         on_func(s.note, s.vel, s.gate, s.on);
 
         held_note = s;
-        uint32_t step_micros = ticks_per_step * tick_micros;
-        uint32_t gate_micros = s.gate * step_micros / 16;
+        uint32_t micros_per_step = ticks_per_step * tick_micros;
+        uint32_t gate_micros = s.gate * micros_per_step / 16;  // s.gate is arbitary 0-15 value
         held_gate_millis = (now_micros + gate_micros) / 1000;
-
-        stepi = (stepi + 1) % numsteps;
+        Serial.printf("trigger: held_gate_milils: %6ld\n", held_gate_millis);
     }
 
-    void toggle_play_pause() {
-        if( playing ) { pause(); }
+    void toggle_play_stop() {
+        if( playing ) { stop(); }
         else { play(); }
     }
 
     // signal to sequencer/MIDI core we want to start playing
     void play() {
-        stepi = 0;
+        stepi = -1; // hmm, but goes to 0 on first downbeat
         ticki = 0;
-        playstate_change = START;
-        last_tick_micros = micros() - tick_micros*2; // FIXME: hmmm
+        //playstate_change = START;
+        last_tick_micros = micros() - tick_micros; // FIXME: hmmm
         playing = true;
+        if(send_clock && !extclk_micros) {
+          clk_func( START );
+        }
     }
 
     // signal to sequencer/MIDI core we want to stop/pause playing
     void pause() {
-        playstate_change = STOP;
+        //playstate_change = STOP;
         playing = false;
     }
 
     // signal to sequencer/MIDI core we want to stop playing
     void stop() {
-        stepi = 0;
-        last_tick_micros = 0;
         playing = false;
-        playstate_change = STOP;
+        stepi = -1;
+        //last_tick_micros = ;
+        //playstate_change = STOP;
+        if(send_clock && !extclk_micros) {
+          clk_func( STOP );
+        }
     }
 
 };
+
+
+// clock_type_t playstate_change;
+
+        // // this is kind of a hack
+        // // handle communication from UI core to sequencer/MIDI core
+        // // translates 'playstate_change' to 'playing' and sending clocks
+        // if( playstate_change == START ) {
+        //     playstate_change = NONE;
+        //     if(send_clock && !ext_clock) {
+        //         clk_func( START );
+        //     }
+        // }
+        // else if( playstate_change == STOP ) {
+        //     playstate_change = NONE;
+        //     if(send_clock && !ext_clock) {
+        //         clk_func( STOP );
+        //     }
+        // }
+        // else if( send_clock && !ext_clock && playing ) {
+        //     clk_func( CLOCK );
+        // }
