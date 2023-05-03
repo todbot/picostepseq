@@ -30,6 +30,9 @@ typedef enum {
   SIXTEENTH_NOTE = 6,
 } valid_ticks_per_step;
 
+const int valid_step_sizes[] = {QUARTER_NOTE, EIGHTH_NOTE, SIXTEENTH_NOTE};
+const int valid_step_sizes_cnt = 3;
+
 typedef void (*TriggerFunc)(uint8_t note, uint8_t vel, uint8_t gate, bool on);
 typedef void (*ClockFunc)(clock_type_t type); // , int pos);
 
@@ -56,7 +59,6 @@ public:
   ClockFunc clk_func;
   Step held_note;
   Step steps[numsteps];
-  uint8_t velocity;   // if set, velocity to use instead of saved
 
   StepSequencer( float atempo=120, uint8_t aseqno=0 ) {
     transpose = 0;
@@ -66,10 +68,8 @@ public:
     ticks_per_step = 6; // 6 = 1/16th, 12 = 1/8, 24 = 1/4,
     seqno = aseqno;
     playing = false;
-    //ext_clock = false;
     extclk_micros = 0;
     send_clock = false;
-    velocity = 0;
     set_tempo(atempo);
     on_func = fake_note_callback;
     off_func = fake_note_callback;
@@ -143,7 +143,6 @@ public:
 
     Step s = steps[stepi];
     s.note += transpose;
-    s.vel = (velocity) ? velocity : s.vel;
 
     on_func(s.note, s.vel, s.gate, s.on);
 
@@ -151,7 +150,6 @@ public:
     uint32_t micros_per_step = ticks_per_step * tick_micros;
     uint32_t gate_micros = s.gate * micros_per_step / 16;  // s.gate is arbitary 0-15 value
     held_gate_millis = (now_micros + gate_micros) / 1000;
-    Serial.printf("trigger: held_gate_milils: %6ld\n", held_gate_millis);
   }
 
   void toggle_play_stop() {

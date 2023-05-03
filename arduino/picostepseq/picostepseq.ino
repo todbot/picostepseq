@@ -40,9 +40,9 @@
 #define myfont2 ter_u12n7b
 
 typedef struct {
-  uint8_t step_size;  // aka "seqr.ticks_per_step"
-  uint8_t midi_chan;
-  uint8_t midi_velocity;
+  int  step_size;  // aka "seqr.ticks_per_step"
+  int  midi_chan;
+  int  midi_velocity;
   bool midi_send_clock;
   bool midi_forward_usb;
   bool midi_forward_uart;
@@ -88,7 +88,6 @@ Adafruit_USBD_MIDI usb_midi;                                  // USB MIDI object
 MIDI_CREATE_INSTANCE(Adafruit_USBD_MIDI, usb_midi, MIDIusb);  // USB MIDI
 MIDI_CREATE_INSTANCE(HardwareSerial, Serial1, MIDIuart);      // Serial MIDI
 
-
 Adafruit_SSD1306 display(dw, dh, &Wire, -1);
 
 Bounce2::Button keys[numsteps];
@@ -108,6 +107,9 @@ Step sequences[numseqs][numsteps];
 uint8_t midiclk_cnt = 0;
 uint32_t midiclk_last_micros = 0;
 
+
+#include "saveload.h" /// FIXME:
+
 //
 // -- MIDI sending & receiving functions
 //
@@ -115,8 +117,8 @@ uint32_t midiclk_last_micros = 0;
 // callback used by Sequencer to trigger note on
 void send_note_on(uint8_t note, uint8_t vel, uint8_t gate, bool on) {
   if (on) {
-    MIDIusb.sendNoteOn(note, vel, cfg.midi_chan);
-    MIDIuart.sendNoteOn(note, vel, cfg.midi_chan);
+    MIDIusb.sendNoteOn(note, cfg.midi_velocity, cfg.midi_chan);
+    MIDIuart.sendNoteOn(note, cfg.midi_velocity, cfg.midi_chan);
   }
   if (midi_out_debug) { Serial.printf("noteOn:  %d %d %d %d\n", note, vel, gate, on); }
 }
@@ -124,8 +126,8 @@ void send_note_on(uint8_t note, uint8_t vel, uint8_t gate, bool on) {
 // callback used by Sequencer to trigger note off
 void send_note_off(uint8_t note, uint8_t vel, uint8_t gate, bool on) {
   if (on) {
-    MIDIusb.sendNoteOff(note, vel, cfg.midi_chan);
-    MIDIuart.sendNoteOff(note, vel, cfg.midi_chan);
+    MIDIusb.sendNoteOff(note, cfg.midi_velocity, cfg.midi_chan);
+    MIDIuart.sendNoteOff(note, cfg.midi_velocity, cfg.midi_chan);
   }
   if (midi_out_debug) { Serial.printf("noteOff: %d %d %d %d\n", note, vel, gate, on); }
 }
@@ -243,6 +245,16 @@ void loop() {
   seqr.update();  // will call send_note_{on,off} callbacks
 }
 
+void configure_sequencer() {
+  Serial.println("configuring sequencer");
+  seqr.set_tempo(tempo);
+  seqr.ticks_per_step = cfg.step_size;
+  seqr.on_func = send_note_on;
+  seqr.off_func = send_note_off;
+  seqr.clk_func = send_clock_start_stop;
+  seqr.send_clock = cfg.midi_send_clock;
+};
+
 //
 // --- UI setup on core1 (buttons, knobs, display, LEDs)
 //
@@ -254,13 +266,7 @@ void setup1() {
   sequences_read();
   sequence_load(seqr.seqno);  // 0
 
-  seqr.set_tempo(tempo);
-  seqr.ticks_per_step = cfg.step_size;
-  seqr.velocity = cfg.midi_velocity;
-  seqr.on_func = send_note_on;
-  seqr.off_func = send_note_off;
-  seqr.clk_func = send_clock_start_stop;
-  seqr.send_clock = cfg.midi_send_clock;
+  configure_sequencer();
 
   // KEYS
   for (uint8_t i = 0; i < numsteps; i++) {
@@ -297,16 +303,6 @@ void setup1() {
   delay(1000);
 }
 
-// variables for UI state management
-int encoder_delta = 0;
-uint32_t encoder_push_millis;
-uint32_t step_push_millis;
-//bool steps_pushed[numsteps]; // which keys are pressed
-int step_push = -1;
-bool step_edited = false;
-char seq_info[11];  // 10 chars + nul FIXME
-bool display_mode = 0;
-
 /**
  * Let's talk about UI input "verbs".  This is what we got:
  *
@@ -327,6 +323,34 @@ bool display_mode = 0;
  * encoder hold + key hold + encoder turn (currently unused)
  *
  */
+
+// variables for UI state management
+int encoder_delta = 0;
+uint32_t encoder_push_millis;
+bool encoder_held = true;
+uint32_t step_push_millis;
+//bool steps_pushed[numsteps]; // which keys are pressed
+int step_push = -1;
+bool step_edited = false;
+char seq_info[11];  // 10 chars + nul FIXME
+
+enum {
+  MODE_PLAY = 0,
+  MODE_CONFIG,
+  MODE_COUNT   // how many modes we got
+};
+
+enum {
+  CFG_STEPSIZE = 0,
+  CFG_MIDICHAN,
+  CFG_MIDIVEL,
+  CFG_MIDISENDCLK,
+  CFG_COUNT
+};
+
+int display_mode = MODE_PLAY;
+int cfg_selected = -1; // one of config_selected
+//int cfg_i = 0; // arbitrary counter to be used by whatever config is selected
 
 //
 // --- UI handling on core1
@@ -358,11 +382,17 @@ void loop1() {
   uint32_t now = millis();
 
   if (encoder_push_millis > 0 ) {
-    if (!step_push_millis && (now-encoder_push_millis) > 1000 ) { // encoder push only > 1sec
-      //display_mode =  (display_mode + 1) % 2; // FIXME: flickers between screens
+    if (!step_push_millis && (now-encoder_push_millis) > 1000 && !encoder_delta ) {
+      if( !encoder_held ) {
+        encoder_held = true;
+        display_mode =  (display_mode + 1) % MODE_COUNT;
+        if( display_mode == MODE_PLAY ) { // switched back to play mode
+          configure_sequencer();
+        }
+      }
     }
-    if (step_push_millis > 0) {
-      if (encoder_push_millis < step_push_millis) {  // encoder pushed first
+    if (step_push_millis > 0) { // we're pushing a step key too
+      if (encoder_push_millis < step_push_millis) {  // and encoder was pushed first
         strcpy(seq_info, "saveseq");
       }
     }
@@ -399,7 +429,35 @@ void loop1() {
     }
     // UI: encoder turn = change transpose
     else {
-      seqr.transpose = constrain(seqr.transpose + encoder_delta, -36, 36);
+      if( display_mode == MODE_PLAY ) { // play screene
+        seqr.transpose = constrain(seqr.transpose + encoder_delta, -36, 36);
+      }
+      else if (display_mode == MODE_CONFIG) {
+        if (cfg_selected==CFG_STEPSIZE) { // ugh
+          if( (encoder_delta >0 && cfg.step_size == QUARTER_NOTE) ||
+              (encoder_delta <0 && cfg.step_size == SIXTEENTH_NOTE) ) {
+            cfg.step_size = EIGHTH_NOTE;
+          }
+          else if( (encoder_delta >0 && cfg.step_size == EIGHTH_NOTE) ||
+                   (encoder_delta <0 && cfg.step_size == QUARTER_NOTE) ) {
+            cfg.step_size = SIXTEENTH_NOTE;
+          }
+          else if( (encoder_delta >0 && cfg.step_size == SIXTEENTH_NOTE) ||
+                   (encoder_delta <0 && cfg.step_size == EIGHTH_NOTE) ) {
+            cfg.step_size = QUARTER_NOTE;
+          }
+          configure_sequencer();
+        }
+        else if(cfg_selected == CFG_MIDICHAN) {
+          cfg.midi_chan = 1 + ((cfg.midi_chan-1) + encoder_delta) % 16;
+        }
+        else if(cfg_selected == CFG_MIDIVEL) {
+          cfg.midi_velocity = 1 + ((cfg.midi_velocity-1) + (encoder_delta*2)) % 127;
+        }
+        else if(cfg_selected == CFG_MIDISENDCLK) {
+          cfg.midi_send_clock = (cfg.midi_send_clock + 1) % 2; // on/off
+        }
+      }
     }
     encoder_delta = 0;  // we own turning, and we've used it
   }
@@ -411,28 +469,28 @@ void loop1() {
 
   if (encoder_switch.released()) {                // release encoder button
     if (step_push == -1 && encoder_delta == 0) {  // step key is not pressed and no encoder turn
-      // UI: encoder tap with no key == play/pause
-      if (now - encoder_push_millis < 300) {
-        seqr.toggle_play_stop();
-        delay(10);  // wait a bit for sequencer to change state
-        if (!seqr.playing) {
-          sequences_write();  // write to disk on pause
+      if( display_mode == MODE_PLAY ) { // play screen
+        // UI: encoder tap with no key == play/pause
+        if (now - encoder_push_millis < 300) {
+          seqr.toggle_play_stop();
+          delay(10);  // wait a bit for sequencer to change state
+          if (!seqr.playing) {
+            sequences_write();  // write to disk on pause
+          }
         }
       }
+      else if( display_mode == MODE_CONFIG ){ // config screen
+        cfg_selected = (cfg_selected + 1) % CFG_COUNT;
+        // FIXME: need to load config
+      }
     }
+    encoder_held = 0;
     encoder_push_millis = 0;  // we own it, and we're done with it
   }
 
-
   // KEYS update
-  // held check
-  // for(uint8_t i=0; i< numsteps; i++) {
-  //   if( keys[i].isPressed() && step_push_millis > 1000 && encoder_push_millis > 0 ) {
-  //     strcpy(seq_info, "saveseq");
-  //   }
-  // }
 
-  // event check
+  // press/release event check
   for (uint8_t i = 0; i < numsteps; i++) {
     keys[i].update();
     Step s = seqr.steps[i];
@@ -482,114 +540,14 @@ void loop1() {
   }
 
   // DISPLAY update
-  if (display_mode == 1) {
+  if (display_mode == MODE_CONFIG) {
     displayConfig();
   }
-  else {
+  else if( display_mode == MODE_PLAY) {
     displayUpdate(step_push);
   }
-
 }
 
-
-//
-// --- sequence load / save functions
-//
-
-uint32_t last_sequence_write_millis = 0;
-
-// write all sequences to "disk"
-void sequences_write() {
-  Serial.println("sequences_write");
-  // save wear & tear on flash, only allow writes every 10 seconds
-  if (millis() - last_sequence_write_millis < 10 * 1000) {  // only allow writes every 10 secs
-    Serial.println("sequences_write: too soon, wait a bit more");
-  }
-  last_sequence_write_millis = millis();
-
-  DynamicJsonDocument doc(8192);  // assistant said 6144
-  for (int j = 0; j < numseqs; j++) {
-    JsonArray seq_array = doc.createNestedArray();
-    for (int i = 0; i < numsteps; i++) {
-      Step s = sequences[j][i];
-      JsonArray step_array = seq_array.createNestedArray();
-      step_array.add(s.note);
-      step_array.add(s.vel);
-      step_array.add(s.gate);
-      step_array.add(s.on);
-    }
-  }
-
-  LittleFS.remove(save_file);
-  File file = LittleFS.open(save_file, "w");
-  if (!file) {
-    Serial.println("sequences_write: Failed to create file");
-    return;
-  }
-  if (serializeJson(doc, file) == 0) {
-    Serial.println(F("sequences_write: Failed to write to file"));
-  }
-  file.close();
-  Serial.print("saved_sequences_json = \"");
-  serializeJson(doc, Serial);
-  Serial.println("\"\nsequences saved");
-}
-
-// read all sequences from "disk"
-void sequences_read() {
-  Serial.println("sequences_read");
-  DynamicJsonDocument doc(8192);  // assistant said 6144
-
-  File file = LittleFS.open(save_file, "r");
-  if (!file) {
-    Serial.println("sequences_read: no sequences file. Using ROM default...");
-    DeserializationError error = deserializeJson(doc, default_saved_sequences_json);
-    if (error) {
-      Serial.print("sequences_read: deserialize default failed: ");
-      Serial.println(error.c_str());
-      return;
-    }
-  } else {
-    DeserializationError error = deserializeJson(doc, file);  // inputLength);
-    if (error) {
-      Serial.print("sequences_read: deserialize failed: ");
-      Serial.println(error.c_str());
-      return;
-    }
-  }
-
-  for (int j = 0; j < numseqs; j++) {
-    JsonArray seq_array = doc[j];
-    for (int i = 0; i < numsteps; i++) {
-      JsonArray step_array = seq_array[i];
-      Step s;
-      s.note = step_array[0];
-      s.vel = step_array[1];
-      s.gate = step_array[2];
-      s.on = step_array[3];
-      sequences[j][i] = s;
-    }
-  }
-  file.close();
-}
-
-// Load a single sequence from into the sequencer from RAM storage
-void sequence_load(int seq_num) {
-  Serial.printf("sequence_load:%d\n", seq_num);
-  for (int i = 0; i < numsteps; i++) {
-    seqr.steps[i] = sequences[seq_num][i];
-  }
-  seqr.seqno = seq_num;
-}
-
-// Store current sequence in sequencer to RAM storage"""
-void sequence_save(int seq_num) {
-  Serial.printf("sequence_save:%d\n", seq_num);
-  for (int i = 0; i < numsteps; i++) {
-    sequences[seq_num][i] = seqr.steps[i];
-    ;
-  }
-}
 
 //
 // --- display details
@@ -609,11 +567,6 @@ const pos_t gate_bar_offset = { .x=0, .y=-15 };
 const pos_t edit_text_offset= { .x=3, .y=22 };
 const int gate_bar_width = 14;
 const int gate_bar_height = 4;
-
-// {x,y} locations of config screen
-const pos_t stepsize_text_pos  = {.x=0, .y=10, .vx=80, .vy = 10, "step size:" };
-const pos_t midichan_text_pos  = {.x=0, .y=30, .vx=80, .vy = 30, "midi ch:" };
-const pos_t midiclock_text_pos = {.x=0, .y=50, .vx=80, .vy = 50, "midi clk:" };
 
 const char* note_strs[] = { "C ", "C#", "D ", "D# ", "E ", "F ", "F#", "G ", "G#", "A ", "A#", "B ", "C " };
 
@@ -669,25 +622,42 @@ void displayUpdate(int selected_step) {
   display.display();
 }
 
+// {x,y} locations of config screen
+const pos_t stepsize_text_pos    = {.x=5, .y=12, .str="step size: %s" };
+const pos_t midichan_text_pos    = {.x=5, .y=24, .str="midi ch:   %d" };
+const pos_t midivel_text_pos     = {.x=5, .y=36, .str="midi vel:  %d" };
+const pos_t midisendclk_text_pos = {.x=5, .y=48, .str="midi sendclk: %s" };
+
 void displayConfig() {
   display.clearDisplay();
   display.setFont(&myfont2);
   display.setTextColor(WHITE, 0);
 
+  if(cfg_selected == CFG_STEPSIZE) {
+    display.drawRect( stepsize_text_pos.x-4, stepsize_text_pos.y-11, 125, 14, WHITE );
+  }
   display.setCursor( stepsize_text_pos.x, stepsize_text_pos.y);
-  display.print(stepsize_text_pos.str);
-  display.setCursor( stepsize_text_pos.vx, stepsize_text_pos.vy);
-  display.printf("%d", cfg.step_size);
+  const char* sstr = (cfg.step_size==SIXTEENTH_NOTE) ? "1/16" : (cfg.step_size==EIGHTH_NOTE) ? "1/8 " : "1/4 ";
+  display.printf(stepsize_text_pos.str, sstr);
 
+
+  if(cfg_selected == CFG_MIDICHAN) {
+    display.drawRect( midichan_text_pos.x-4, midichan_text_pos.y-11, 125, 14, WHITE );
+  }
   display.setCursor( midichan_text_pos.x, midichan_text_pos.y);
-  display.print(midichan_text_pos.str);
-  display.setCursor( midichan_text_pos.vx, midichan_text_pos.vy);
-  display.printf("%d", cfg.midi_chan);
+  display.printf(midichan_text_pos.str, cfg.midi_chan);
 
-  display.setCursor( midiclock_text_pos.x, midiclock_text_pos.y);
-  display.print(midiclock_text_pos.str);
-  display.setCursor( midiclock_text_pos.vx, midiclock_text_pos.vy);
-  display.printf("%s", cfg.midi_send_clock ? "on":"off");
+  if(cfg_selected == CFG_MIDIVEL) {
+    display.drawRect( midivel_text_pos.x-4, midivel_text_pos.y-11, 125, 14, WHITE );
+  }
+  display.setCursor( midivel_text_pos.x, midivel_text_pos.y);
+  display.printf(midivel_text_pos.str, cfg.midi_velocity);
+
+  if(cfg_selected == CFG_MIDISENDCLK) {
+    display.drawRect( midisendclk_text_pos.x-4, midisendclk_text_pos.y-11, 125, 14, WHITE );
+  }
+  display.setCursor( midisendclk_text_pos.x, midisendclk_text_pos.y);
+  display.printf(midisendclk_text_pos.str, cfg.midi_send_clock ? "on":"off");
 
   display.display();
 }
@@ -697,7 +667,7 @@ void displaySplash() {
   display.setFont(&myfont2);
   display.setTextColor(WHITE, 0);
   display.drawRect(0,0, dw-1, dh-1, WHITE);
-  display.setCursor(30, 32);
+  display.setCursor(25, 32);
   display.print("PICOSTEPSEQ");
   display.display();
   // a little LED dance
