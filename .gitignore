@@ -1,4 +1,10 @@
+# Ignore Arduino IDE 2.0 meta
+.theia
+
 # Ignore list for Eagle, a PCB layout tool
+
+# CAMOutputs
+CAMOutputs
 
 # Backup files
 *.s#?
