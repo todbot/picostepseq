@@ -144,7 +144,7 @@ void send_clock_start_stop(clock_type_t type) {
     MIDIusb.sendClock();
     MIDIuart.sendClock();
   }
-  //if (midi_out_debug) { Serial.printf("\tclk:%d\n", type); }
+  if (midi_out_debug) { Serial.printf("\tclk:%d\n", type); }
 }
 
 // void handle_midi_in_songpos(unsigned int beats) {
@@ -223,8 +223,8 @@ void midi_read_and_forward() {
 // ---  MIDI in/out setup on core0
 //
 void setup() {
-  USBDevice.setManufacturerDescriptor("todbot");
-  USBDevice.setProductDescriptor("PicoStepSeq");
+  TinyUSBDevice.setManufacturerDescriptor("todbot");
+  TinyUSBDevice.setProductDescriptor("PicoStepSeq");
 
   Serial1.setRX(midi_rx_pin);
   Serial1.setTX(midi_tx_pin);
@@ -449,10 +449,10 @@ void loop1() {
           configure_sequencer();
         }
         else if(cfg_selected == CFG_MIDICHAN) {
-          cfg.midi_chan = 1 + ((cfg.midi_chan-1) + encoder_delta) % 16;
+          cfg.midi_chan = constrain( 1 + ((cfg.midi_chan-1) + encoder_delta) % 16, 1,16);
         }
         else if(cfg_selected == CFG_MIDIVEL) {
-          cfg.midi_velocity = 1 + ((cfg.midi_velocity-1) + (encoder_delta*2)) % 127;
+          cfg.midi_velocity = constrain( 1 + ((cfg.midi_velocity-1) + (encoder_delta*2)) % 127, 1,127);
         }
         else if(cfg_selected == CFG_MIDISENDCLK) {
           cfg.midi_send_clock = (cfg.midi_send_clock + 1) % 2; // on/off
@@ -552,19 +552,19 @@ void loop1() {
 //
 // --- display details
 //
-typedef struct { int x; int y; int vx; int vy; const char* str;} pos_t;
+typedef struct { int x; int y;  const char* str;} pos_t;
 
 //// {x,y} locations of play screen items
 const int step_text_pos[] = { 0, 15, 16, 15, 32, 15, 48, 15, 64, 15, 80, 15, 96, 15, 112, 15 };
-const pos_t bpm_text_pos    = {.x=0,  .y=57, .vx=0, .vy=0, .str="bpm:%3d" };
-const pos_t trans_text_pos  = {.x=55, .y=57, .vx=0, .vy=0, .str="trs:%+2d" };
-const pos_t seqno_text_pos  = {.x=0,  .y=45, .vx=0, .vy=0, .str="seq:%d" };
-const pos_t seq_info_pos    = {.x=60, .y=45 };
-const pos_t play_text_pos   = {.x=110,.y=57 };
+const pos_t bpm_text_pos    = {.x=0,  .y=57, .str="bpm:%3d" };
+const pos_t trans_text_pos  = {.x=55, .y=57, .str="trs:%+2d" };
+const pos_t seqno_text_pos  = {.x=0,  .y=45, .str="seq:%d" };
+const pos_t seq_info_pos    = {.x=60, .y=45, .str="" };
+const pos_t play_text_pos   = {.x=110,.y=57, .str="" };
 
-const pos_t oct_text_offset = { .x=3, .y=10 };
-const pos_t gate_bar_offset = { .x=0, .y=-15 };
-const pos_t edit_text_offset= { .x=3, .y=22 };
+const pos_t oct_text_offset = { .x=3, .y=10,  .str="" };
+const pos_t gate_bar_offset = { .x=0, .y=-15, .str="" };
+const pos_t edit_text_offset= { .x=3, .y=22,  .str="" };
 const int gate_bar_width = 14;
 const int gate_bar_height = 4;
 
@@ -623,10 +623,10 @@ void displayUpdate(int selected_step) {
 }
 
 // {x,y} locations of config screen
-const pos_t stepsize_text_pos    = {.x=5, .y=12, .str="step size: %s" };
-const pos_t midichan_text_pos    = {.x=5, .y=24, .str="midi ch:   %d" };
-const pos_t midivel_text_pos     = {.x=5, .y=36, .str="midi vel:  %d" };
-const pos_t midisendclk_text_pos = {.x=5, .y=48, .str="midi sendclk: %s" };
+const pos_t stepsize_text_pos    = {.x=5, .y=12, .str="step size: %s"};
+const pos_t midichan_text_pos    = {.x=5, .y=24, .str="midi ch:   %d"};
+const pos_t midivel_text_pos     = {.x=5, .y=36, .str="midi vel:  %d"};
+const pos_t midisendclk_text_pos = {.x=5, .y=48, .str="midi sendclk: %s"};
 
 void displayConfig() {
   display.clearDisplay();
