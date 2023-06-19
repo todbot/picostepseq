@@ -55,6 +55,7 @@ do_serial_midi = True
 
 playdebug = False
 
+midi_chan = 1
 base_note = 60  #  60 = C4, 48 = C3
 num_steps = 8
 tempo = 100
@@ -105,20 +106,22 @@ def midi_receive():
 
 
 def play_note_on(note, vel, gate, on):  #
-    """Callback for sequencer when note should be tured on"""
+    """Callback for sequencer when note should be turned on"""
     if not on: return
     if playdebug: print("on :%d n:%3d v:%3d %d %d" % (note,vel, gate,on), end="\n" )
-    midi_msg = bytearray([0x90, note, vel])  # FIXME
+    midi_status = 0x90 | (midi_chan-1)
+    midi_msg = bytearray([midi_status, note, vel])
     if do_usb_midi:
         usb_out.write( midi_msg )
     if do_serial_midi:
         hw.midi_uart.write( midi_msg )
 
 def play_note_off(note, vel, gate, on):  #
-    """Callback for sequencer when note should be tured off"""
+    """Callback for sequencer when note should be turned off"""
     #if on: # FIXME: always do note off to since race condition of note muted right after playing
     if playdebug: print("off:%d n:%3d v:%3d %d %d" % (note,vel, gate,on), end="\n" )
-    midi_msg = bytearray([0x80, note, vel])  # FIXME
+    midi_status = 0x80 | (midi_chan-1)
+    midi_msg = bytearray([midi_status, note, vel])
     if do_usb_midi:
         usb_out.write( midi_msg )
     if do_serial_midi:
