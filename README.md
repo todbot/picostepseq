@@ -87,6 +87,19 @@ This is so either can be removed for other uses, so you don't have to sacrifice 
 
 ### Installing Firmware (CircuitPython)
 
+#### Arduino version:
+
+Probalby the easiest way to get PicoStepSeq running is to install the precompiled Arduino UF2
+version in the [Releases](https://github.com/todbot/picostepseq/releases) section.
+
+The Arduino firmware lives in `arduino/picostepseq`.
+To compile the Arduino firmware, see the top of the `picostepseq.ino` file.
+
+
+#### CircuitPython version:
+
+To install the CircuitPython version:
+
 The firmware lives in the `circuitpython/picostepseq` directory.
 
 1. Copy all files in the `circuitpython/picostepseq` directory to the CIRCUITPY disk.
