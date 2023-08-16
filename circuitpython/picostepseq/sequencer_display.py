@@ -110,8 +110,12 @@ class SequencerDisplay(displayio.Group):
         self.play_text.text = " >" if self.seq.playing else "||"
 
     def update_ui_transpose(self):
-        self.transpose_val.text = "%+2d" % self.seq.transpose
-
+        try:
+            self.transpose_val.text = "%+2d" % self.seq.transpose
+        except AttributeError:
+            pass
+        
+        
     def update_ui_seqno(self, msg=None):
         self.seqno_text.text = msg or f"seq: {self.seq.seqno+1}"  # 1-index for humans, matches silkscreen
 
