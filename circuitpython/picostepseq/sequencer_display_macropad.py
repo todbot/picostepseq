@@ -9,7 +9,7 @@ import vectorio
 from adafruit_display_text import bitmap_label as label
 from adafruit_bitmap_font import bitmap_font
 
-from sequencer_display import StepSequencerDisplay
+from sequencer_display import SequencerDisplay
 
 uidebug = False
 
@@ -26,7 +26,7 @@ gate_bar_offset = (1,-8)
 gate_bar_width, gate_bar_height = (14,4)
 edit_text_offset = (3,20)
 
-class SequencerDisplayMacroPad(StepSequencerDisplay):
+class SequencerDisplayMacroPad(SequencerDisplay):
     def __init__(self, sequencer):
         super().__init__(sequencer)
 
