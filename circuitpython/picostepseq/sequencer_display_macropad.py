@@ -19,6 +19,7 @@ step_text_pos = ( (0,10), (16,10), (32,10), (48,10),
 bpm_text_pos = (0, 115)
 bpm_val_pos = (25, 115)
 trans_text_pos = (0, 100)
+trans_val_pos = (25, 100)
 seqno_text_pos = (0,85)
 play_text_pos = (50,115)
 oct_text_offset = (2,11)  # four per line
@@ -56,11 +57,13 @@ class SequencerDisplayMacroPad(SequencerDisplay):
         self.bpm_text = label.Label(font2, text="bpm:", x=bpm_text_pos[0], y=bpm_text_pos[1])
         self.bpm_val = label.Label(font2, text="bpm:", x=bpm_val_pos[0], y=bpm_val_pos[1])
         self.transpose_text = label.Label(font2, text="trans", x=trans_text_pos[0], y=trans_text_pos[1])
+        self.transpose_val = label.Label(font2, text="+0", x=trans_val_pos[0], y=trans_val_pos[1])
         self.play_text = label.Label(font, text="||", x=play_text_pos[0], y=play_text_pos[1])
         self.append(self.bpm_text)
         self.append(self.bpm_val)
         self.append(self.play_text)
         self.append(self.transpose_text)
+        self.append(self.transpose_val)
         self.append(self.seqno_text)
 
     def update_ui_step(self, step=None, n=0, v=127, gate=8, on=True, selected=False):
