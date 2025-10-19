@@ -55,3 +55,7 @@ eagle.epf
 
 # file locks introduced since 7.x
 *.lck
+
+# ignore macos system files
+.DS_Store
+*.DS_Store
