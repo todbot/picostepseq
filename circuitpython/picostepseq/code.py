@@ -164,7 +164,7 @@ seqr = StepSequencer(num_steps, tempo, play_note_on, play_note_off, playing=Fals
 sequences_read()
 
 seqr_display = SequencerDisplay(seqr)
-hw.display.show(seqr_display)
+hw.display.root_group = seqr_display
 
 sequence_load(0)
 

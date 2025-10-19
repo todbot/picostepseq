@@ -107,7 +107,7 @@ The firmware lives in the `circuitpython/picostepseq` directory.
    If using a Mac terminal, you can do:
    ```sh
    cd picostepseq/circuitpython/picostepseq
-   cp -rX * /Volumes/CIRUITPY
+   cp -rX * /Volumes/CIRCUITPY
    ```
 
 2. Install the CircuitPython libraries `adafruit_displayio_ssd1306` and `adafruit_display_text`
